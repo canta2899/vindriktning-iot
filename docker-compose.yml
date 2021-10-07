@@ -1,0 +1,20 @@
+version: "3.9"
+services:
+
+  broker:
+    image: eclipse-mosquitto
+    container_name: broker
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./broker/data:/mosquitto/data
+      - ./broker/config:/mosquitto/config
+      - ./broker/log:/mosquitto/log
+
+  mqtt_app:
+    build: .
+    container_name: mqtt_app
+    volumes:
+      - ./mqtt_app:/app
+    
