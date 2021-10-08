@@ -1,0 +1,7 @@
+FROM eclipse-mosquitto
+
+COPY broker-entrypoint.sh /
+
+ENTRYPOINT ["sh", "./broker-entrypoint.sh"]
+
+CMD ["/usr/sbin/mosquitto", "-c", "/mosquitto/config/mosquitto.conf"]
