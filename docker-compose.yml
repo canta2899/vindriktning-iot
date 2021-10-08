@@ -2,19 +2,28 @@ version: "3.9"
 services:
 
   broker:
+    build:
+      context: .
+      dockerfile: Dockerfile_broker 
+    environment:
+      - MOSQUITTO_USERNAME=${MOSQUITTO_USERNAME}
+      - MOSQUITTO_PASSWORD=${MOSQUITTO_PASSWORD}
     image: eclipse-mosquitto
     container_name: broker
     ports:
       - "1883:1883"
-      - "9001:9001"
     volumes:
       - ./broker/data:/mosquitto/data
       - ./broker/config:/mosquitto/config
       - ./broker/log:/mosquitto/log
+    restart: always
 
   mqtt_app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile_subscriber
     container_name: mqtt_app
     volumes:
       - ./mqtt_app:/app
-    
+    depends_on:
+      - "broker"
