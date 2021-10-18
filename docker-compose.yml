@@ -1,5 +1,32 @@
-version: "3.9"
+version: "3"
 services:
+  mqtt_app:
+    build:
+      context: .
+      dockerfile: Dockerfile_subscriber
+    container_name: mqtt_app
+    environment:
+      - INFLUXDB_MQTT_USER=${INFLUXDB_MQTT_USER}
+      - INFLUXDB_MQTT_PASSWORD=${INFLUXDB_MQTT_PASSWORD}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - MOSQUITTO_USERNAME=${MOSQUITTO_USERNAME}
+      - MOSQUITTO_PASSWORD=${MOSQUITTO_PASSWORD}
+    depends_on:
+      - "broker"
+      - "database"
+      - "logapp"
+    restart: always
+
+  logapp:
+    build:
+      context: .
+      dockerfile: Dockerfile_logger
+    container_name: logapp
+    volumes:
+      - logvolume:/log
+    ports:
+      - "8000:5000"
+    restart: always
 
   broker:
     build:
@@ -8,7 +35,6 @@ services:
     environment:
       - MOSQUITTO_USERNAME=${MOSQUITTO_USERNAME}
       - MOSQUITTO_PASSWORD=${MOSQUITTO_PASSWORD}
-    image: eclipse-mosquitto
     container_name: broker
     ports:
       - "1883:1883"
@@ -18,12 +44,27 @@ services:
       - ./broker/log:/mosquitto/log
     restart: always
 
-  mqtt_app:
+  database:
     build:
       context: .
-      dockerfile: Dockerfile_subscriber
-    container_name: mqtt_app
+      dockerfile: Dockerfile_influxdb
+    container_name: database
+    environment:  
+      - INFLUXDB_ADMIN_USER=${INFLUXDB_ADMIN_USER}
+      - INFLUXDB_ADMIN_PASSWORD=${INFLUXDB_ADMIN_PASSWORD}
+    ports:
+      - "8086:8086"
+    restart: always 
+    
+  charts:
+    image: grafana/grafana
+    container_name: charts
     volumes:
-      - ./mqtt_app:/app
-    depends_on:
-      - "broker"
+      - grafana:/var/lib/grafana
+    ports:
+      - "3000:3000"
+
+volumes:
+  logvolume:
+  grafana:
+

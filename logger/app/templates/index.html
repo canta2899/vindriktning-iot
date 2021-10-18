@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>
+        Logging Platform
+    </title>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href=" {{ url_for('static', filename='css/bootstrap.min.css') }} "> 
+    <link rel="stylesheet" href=" {{ url_for('static', filename='css/style.css') }}">
+  </head>
+  <body>
+
+    <div class="page-holder bg">
+        <div class="container-fluid py-5">
+        <h1 class="text-center titlecolor shadow-lg">VINDRIKTNING Station</h1>
+        <h3 class="text-center text-muted">Monitoring tool</h3>
+
+        <section class="terminal-container terminal-fixed-top">
+          <header class="terminal">
+            <a class="button red" href="#"></a>
+            <a class="button yellow" href="#"></a>
+            <a class="button green" href="#"></a>
+          </header>
+        
+          <div class="terminal-home" id="contentplace"></div>
+        </section>
+        <div class="row justify-content-center">
+          <div class="col-sm text-center">
+            <a name="" id="" class="btn btn-secondary btn-lg" style="width: 180px; margin-bottom: 20px;" href="/download" role="button">Get logfile</a>
+          </div>
+          <div class="col-sm text-center">
+            <button type="button" id="switchstream" class="btn btn-success btn-lg" style="width: 180px; margin-bottom: 20px;">Start streaming</button>
+          </div>
+          <div class="col-sm text-center">
+            <button type="button" id="tokensbtn" class="btn btn-secondary btn-lg" data-toggle="modal" data-target="#tokens" style="width: 180px; margin-bottom: 20px;">Inspect tokens </button>
+          </div>
+        </div>
+            
+            <!-- Modal -->
+            <div class="modal fade" id="tokens" tabindex="-1" role="dialog" aria-labelledby="tokens" aria-hidden="true">
+              <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Assigned tokens</h5>
+                          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                          </button>
+                      </div>
+                  <div class="modal-body">
+                    <div class="container-fluid">
+                      <table class="table">
+                        <thead>
+                          <tr>
+                            <th>Username</th>
+                            <th>ChatID</th>
+                            <th>Token</th>
+                          </tr>
+                        </thead>
+                        <tbody class="console"></tbody>
+                      </table>
+                      <!-- rows -->
+                    </div>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+    </div>
+
+    <!-- Optional JavaScript -->
+    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+    <script src=" {{ url_for('static', filename='js/jquery-3.3.1.slim.min.js')}} "></script>
+    <script src=" {{ url_for('static', filename='js/popper.min.js')}} "></script>
+    <script src=" {{ url_for('static', filename='js/bootstrap.min.js') }} "></script>
+
+    <script>
+      var source;
+      var isStreaming = false;
+
+      function mapColor(stat){
+        switch(stat){
+          case "INFO":
+            return "txtinfo";
+          case "DEBUG":
+            return "txtdebug";
+          case "WARNING":
+            return "txtwarning";
+          case "ERROR":
+            return "txterror";
+          case "CRITICAL":
+            return "txtcritical";
+        }
+      }
+
+      function streamLog(){
+        console.log("Starting logfile stream");
+        source = new EventSource("/log");
+        source.onmessage = function(event) {
+          let color = mapColor(event.data.split(" : ")[1]);
+
+          $('#contentplace').prepend('<p class="console ' + color + '">'+event.data+'</p>');
+          // if(event.data == 100){
+          //   source.close();
+          // }
+        }
+      }
+
+      function stopLog(){
+        console.log("Stopping logfile stream");
+        source.close();
+      }
+
+      $("#switchstream").click((e) => {
+        isStreaming = !isStreaming;
+        if(isStreaming){
+          streamLog();
+          $("#switchstream").html("Stop streaming");
+        }else{
+          stopLog();
+          $("#switchstream").html("Start streaming");
+        }
+        $("#switchstream").toggleClass("btn-success");
+        $("#switchstream").toggleClass("btn-danger");
+      })
+
+      $("#tokensbtn").click((e) => {
+        fetch('/tokens', {
+          method: 'GET', 
+          cache: 'no-cache',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+        }).then(r => r.json())
+          .then(val => {
+            $("tbody").html("");
+            val.forEach(t => {
+              console.log(t);
+              if(t.done){
+                $("tbody").append("<tr class='green'><td scope='row'>" + t.username + "</td><td>" + t.chat_id + "</td><td>" + t.token + "</td></tr>");
+              }else{
+                $("tbody").append("<tr class='yellow'><td scope='row'>" + t.username + "</td><td>" + t.chat_id + "</td><td>" + t.token + "</td></tr>");
+              }
+            })
+          });
+      });
+
+
+
+      // var source_progress = new EventSource("/progress");
+      // source_progress.onmessage = function(event) {
+      //   $('#progress').text(event.data+'%');
+      //   $('#progress').value(event.data);
+      //   if(event.data == 100){
+      //     source_progress.close()
+      //   }
+      // }
+    </script>
+  </body>
+</html>

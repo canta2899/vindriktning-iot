@@ -1,0 +1,44 @@
+INITIALIZING LOG FILE
+
+2021-10-17 23:56:24.565515 : DEBUG : Getting updates from telegram
+
+2021-10-17 23:56:24.568701 : INFO : Configuration done, starting main loop
+
+2021-10-17 23:56:24.579559 : WARNING : Sensor VINDRIKTNING-54F9AE disconnected from the network.
+
+2021-10-17 23:56:24.615868 : ERROR : Couldn't perform update query for VINDRIKTNING-54F9AE with msg: {'pm25': 53, 'ip': '192.168.1.10', 'quality': 1, 'name': 'Camera2'}. If your container just started it might be ok
+
+2021-10-17 23:56:24.971562 : INFO : Sensor VINDRIKTNING-54F9AE connected to the network
+
+2021-10-17 23:56:26.068165 : DEBUG : Updating values
+
+2021-10-17 23:56:26.074981 : DEBUG : Pushing notification
+
+2021-10-17 23:56:26.080977 : INFO : Sensor Camera2 (192.168.1.10) triggered a notification
+
+2021-10-17 23:56:31.310495 : DEBUG : Updating values
+
+2021-10-17 23:56:36.382012 : DEBUG : Updating values
+
+2021-10-17 23:56:39.778847 : DEBUG : Updates gotten
+
+2021-10-17 23:56:39.873495 : DEBUG : All notifications sent
+
+2021-10-17 23:56:40.082808 : DEBUG : Getting updates from telegram
+
+2021-10-17 23:56:41.321512 : DEBUG : Updating values
+
+2021-10-17 23:56:46.439800 : DEBUG : Updating values
+
+2021-10-17 23:56:51.369504 : DEBUG : Updating values
+
+2021-10-17 23:56:55.166235 : DEBUG : Updates gotten
+
+2021-10-17 23:56:55.173999 : DEBUG : All notifications sent
+
+2021-10-17 23:56:55.381132 : DEBUG : Getting updates from telegram
+
+2021-10-17 23:56:56.434975 : DEBUG : Updating values
+
+2021-10-17 23:56:57.520205 : CRITICAL : Stopping the telegram bot
+

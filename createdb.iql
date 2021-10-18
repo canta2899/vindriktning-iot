@@ -1,0 +1,4 @@
+CREATE DATABASE airquality WITH DURATION 7d
+CREATE USER bridge WITH PASSWORD 'bridge'
+CREATE USER grafana WITH PASSWORD 'graphuser'
+GRANT READ ON airquality to grafana
