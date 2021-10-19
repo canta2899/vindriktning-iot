@@ -1,3 +1,4 @@
+from typing import DefaultDict
 from flask import Flask
 from flask import render_template
 from flask import Response
@@ -6,12 +7,10 @@ from flask import request
 from flask import redirect
 from flask import url_for
 from pygtail import Pygtail
-from secrets import token_urlsafe
-import signal
+from datetime import datetime, timedelta
 import time
 import json
 import os
-import sys
 
 LOG_FILE = '/log/logfile.log'
 LOG_OFFSET_FILE = '/log/logfile.log.offset'
@@ -36,24 +35,15 @@ if os.path.exists(LOG_FILE):
 if os.path.exists(LOG_OFFSET_FILE):
     os.remove(LOG_OFFSET_FILE)
 
-def sigint_handler(signal, frame):
-    logfile.write("Closing after receiving SIGINT")
-    # logfile.close()
-    sys.exit(0)
-
-def sigterm_handler(signal, frame):
-    logfile.write("Closing after receiving SIGTERM")
-    # logfile.close()
-    sys.exit(0)
-
-signal.signal(signal.SIGINT, sigint_handler)
-signal.signal(signal.SIGTERM, sigterm_handler)
+def defaultconverter(o):
+    if isinstance(o, datetime):
+        return o.__str__()
 
 def update_token_file():
     global alltokens 
     tmp = alltokens.copy()
     with open(TOKENS_FILE, 'w') as f:
-        f.write(json.dumps(alltokens))
+        f.write(json.dumps(tmp, default=defaultconverter))
 
 @app.route('/')
 def entry_point():
@@ -70,18 +60,11 @@ def progress_log():
         mimetype='text/event-stream'
     )
 
-@app.route('/tokens')
+@app.route('/api/tokens')
 def tokens():
-    response = []
-    for key, value in alltokens.items():
-        response.append({
-            "chat_id": key,
-            "username": value['username'],
-            "token": value['token'],
-            "done": value['done']
-        })
+    response = [token for token in alltokens.values()]
     return Response(
-        json.dumps(response), 
+        json.dumps(response, default=defaultconverter), 
         mimetype='application/json'
     )
 
@@ -100,55 +83,74 @@ def logging():
     with open(LOG_FILE, 'a') as f:
         f.write(req_data['msg'] + "\n\n")
         return {"msg": "ok"}, 200
-    return {
-        "msg": "Unable to handle request"    
-    }, 500
 
-@app.route("/validatetoken", methods=['POST'])
+@app.route("/api/validate", methods=['GET'])
 def validatetoken():
     re = request.get_json()
     chat_id = re['chat_id']
     username = re['username']
-    token = re['token'] 
-    try:
-        valid_token = alltokens[str(chat_id)]
-        if token == valid_token['token']:
-            alltokens[str(chat_id)]['done'] = True
-            update_token_file()
+    if username in alltokens:
+        if datetime.now() > alltokens[username]['expires']:
             return {
-                "msg": "ok"    
-            }, 200
-    except Exception as e:
-        pass
-    return {
-        "msg": "bad_token"
-    }, 401
+                "msg": "token_expired"
+            }, 401
 
-@app.route("/newtoken", methods=['GET'])
-def newtoken():
-    try:
-        re = request.get_json()
-        chat_id = re['chat_id']
-        username = re['username']
-        new_token = {
-            'username': username,
-            'token': token_urlsafe(12),
-            'done': False
-        }
-        alltokens[str(chat_id)] = new_token
-        update_token_file()
+        if alltokens[username]['chat_id'] == '':
+            alltokens[username]['chat_id'] = chat_id
+            update_token_file()
+
         return {
-            "msg": "new_token_made"        
+            "msg": "ok"
         }, 200
-    except Exception as e:
+    else:
         return {
-            "msg": "error"        
-        }, 500
-    
-@app.route("/whitelist")
-def whitelist():
-    resp = json.dumps(list(alltokens.keys()))
-    return Response(resp, mimetype='application/json'), 200
+            "msg": "not_authorized"
+        }, 401
+
+@app.route("/api/newtoken", methods=['POST'])
+def newtoken():
+    re = request.get_json()
+    username = re['username']
+    duration = re['duration']
+
+    new_token = {
+        'chat_id': '',
+        'username': username,
+        'expires': datetime.now() + timedelta(days=int(duration))
+    }
+
+    alltokens[username] = new_token
+    update_token_file()
+
+    response = {
+        'status': 'ok',
+        'tokens': alltokens
+    }
+
+    return Response(
+        json.dumps(response, default=defaultconverter), 
+        mimetype='application/json'
+    ), 200
+
+@app.route("/api/deltoken", methods=['POST'])
+def deltoken():
+    re = request.get_json()
+    username = re['username']
+
+    removed = alltokens.pop(username, None)
+
+    if not removed:
+        return {
+            'status': 'not_found'        
+        }, 404 
+
+    update_token_file()
+
+    return {
+        'status': 'ok'
+    }, 200
+
+
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0')

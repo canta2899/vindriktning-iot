@@ -2382,3 +2382,30 @@
 1634559434: Client auto-9654E2A9-915E-BC34-9753-E47E4B45F3D3 closed its connection.
 1634559434: mosquitto version 2.0.12 terminating
 1634559434: Saving in-memory database to /mosquitto/data/mosquitto.db.
+1634603873: mosquitto version 2.0.12 starting
+1634603873: Config loaded from /mosquitto/config/mosquitto.conf.
+1634603873: Opening ipv4 listen socket on port 1883.
+1634603873: Opening ipv6 listen socket on port 1883.
+1634603873: mosquitto version 2.0.12 running
+1634603874: New connection from 172.29.0.6:33997 on port 1883.
+1634603874: New client connected from 172.29.0.6:33997 as auto-A39629CA-3D71-4A42-6D8F-DAEB8C09AD05 (p2, c1, k60, u'mosquitto').
+1634604168: mosquitto version 2.0.12 starting
+1634604168: Config loaded from /mosquitto/config/mosquitto.conf.
+1634604168: Opening ipv4 listen socket on port 1883.
+1634604168: Opening ipv6 listen socket on port 1883.
+1634604168: mosquitto version 2.0.12 running
+1634604169: New connection from 172.29.0.6:38073 on port 1883.
+1634604169: New client connected from 172.29.0.6:38073 as auto-338641C0-C214-B057-0B3B-C4E3118C5F7D (p2, c1, k60, u'mosquitto').
+1634604290: mosquitto version 2.0.12 starting
+1634604290: Config loaded from /mosquitto/config/mosquitto.conf.
+1634604290: Opening ipv4 listen socket on port 1883.
+1634604290: Opening ipv6 listen socket on port 1883.
+1634604290: mosquitto version 2.0.12 running
+1634604291: New connection from 172.29.0.6:57327 on port 1883.
+1634604291: New client connected from 172.29.0.6:57327 as auto-068A9610-BE21-2138-2A07-48B8E40CDD64 (p2, c1, k60, u'mosquitto').
+1634604474: Client auto-068A9610-BE21-2138-2A07-48B8E40CDD64 closed its connection.
+1634604474: New connection from 172.29.0.6:58185 on port 1883.
+1634604474: New client connected from 172.29.0.6:58185 as auto-84AB69A5-60CD-C379-F590-8A326C0BB196 (p2, c1, k60, u'mosquitto').
+1634604483: Client auto-84AB69A5-60CD-C379-F590-8A326C0BB196 closed its connection.
+1634604483: mosquitto version 2.0.12 terminating
+1634604483: Saving in-memory database to /mosquitto/data/mosquitto.db.

@@ -40,9 +40,7 @@ BROKER_PASSWORD = os.environ['MOSQUITTO_PASSWORD']
 
 # Bot params
 TELEGRAM_BOT_TOKEN = os.environ['TELEGRAM_BOT_TOKEN'] 
-TOKEN_ENDPOINT = 'http://logapp:5000/validatetoken'
-NEW_TOKEN_ENDPOINT = 'http://logapp:5000/newtoken'
-WHITELIST_ENDPOINT = 'http://logapp:5000/whitelist'
+TOKEN_ENDPOINT = 'http://logapp:5000/api/validate'
 LOG_ENDPOINT = 'http://logapp:5000/logging'
 
 
@@ -131,16 +129,14 @@ class Logger:
                                                                   
        1. The bot doesnt respond by default                       
                                                                   
-       2. By sending `/token` the bot creates a new token         
-          for the chat_id requesting                              
-                                                                  
-       3. With `/token invalid_token` nothing happens             
-                                                                  
-       3. After sending `/token valid_token` access is enabled    
+       2. The bot must be authorized on the logapp. A token will be
+          generated and saved
                                                                   
        4. Commands available then are:                            
             - /status (list online sensors)                       
             - /info [sensor name] (check last known status)       
+
+            If the user is validated, the bot will respond.
                                                                   
        You will receive notifications for quality changes         
                                                                   
@@ -213,6 +209,7 @@ class Bot:
         self.max_retries = 30
         self.logging = Logger(LOG_ENDPOINT)
         self.s = r.Session()
+        self.apisession = r.Session()
 
         # Requests whitelist to the api
         self.whitelist = self.__get_whitelist()
@@ -309,74 +306,31 @@ class Bot:
             self.send(msg, int(chatid))
 
     
-    def __request_token_validation(self, chat_id, username, s_token):
+    def __validate_user(self, username, chat_id):
 
         """
             Requests to the logapp api if the
             token for the user is valid
         """
 
-        s_token = s_token.strip()
-        
         # Requesting validation to the api
-        validation = r.post(
-            TOKEN_ENDPOINT,
-            json={
-                'chat_id': chat_id,
-                'username': username,
-                'token': s_token
-            }
-        )
-
-        if validation.status_code == 200:
-            self.logging.info(
-                f"Chat id {chat_id} validated access"
+        try:
+            validation = self.apisession.get(
+                TOKEN_ENDPOINT,
+                json={
+                    'chat_id': chat_id,
+                    'username': username,
+                }
             )
-            self.send(
-                "Great! You're ready to go.",
-                chat_id
+        except Exception as e:
+            self.logging.error(
+                f"Validation request caused exception: {e}"
             )
-            self.whitelist.append(s_token)
-        else:
-            self.logging.warning(
-                f"Chat id {chat_id} failed "
-                "to validate token: {e}"
-            )
-            self.send(
-                "Oops, seems like that token "
-                "is invalid. You can request "
-                "a new one with /token", 
-                chat_id
-            )
+            self.apisession = r.Session()
+            return False
 
 
-    def __request_new_token(self, chat_id, username):
-        newtoken = self.s.get(
-            NEW_TOKEN_ENDPOINT,
-            json={
-                'chat_id': chat_id,
-                'username': username
-            }
-        )
-        if newtoken.status_code == 200:
-            self.logging.info(
-                f"User {username} made a new token request"
-            )
-            self.send(
-                "The sensor status is top secret 🤫\n"
-                "I made a token for you, send it with "
-                "/token [YOUR_TOKEN] and I'll give you "
-                "access 💪", chat_id
-            )
-        else:
-            self.logging.info(
-                f"Unable to produce token for the user {username}"
-            )
-            self.send(
-                "Sorry, I couldn't make a new token for "
-                "you 😭. Try again later", chat_id
-            )
-
+        return validation.status_code == 200
 
 
     def __parse_msg(self, msg):
@@ -386,9 +340,9 @@ class Bot:
                 
                 - retrieving chatid, msg, user
                 - splitting message by ' '
-                - processing token request if msg is
-                  '/token'
-                - searching for a binded callback otherwise
+                - searching for a binded callback
+                - responding if the user is validated by
+                  the logapp endpoint
         """
 
         # Extracting chat_id, splitting message by whitespaces
@@ -404,45 +358,25 @@ class Bot:
             )
             return
         
-        # If the message is a token request
-        if mlist[0] == '/token':
-
-            # If a token is specified
-            if len(mlist) > 1:
-                self.__request_token_validation(
-                    chat_id,
-                    username,
-                    mlist[1]
-                )
-            
+        # Checking for a callback and performing validation
+        if mlist[0] in self.callbacks.keys():
+            if self.__validate_user(username, chat_id):
+                try:
+                    self.callbacks[mlist[0]](
+                            chat_id, 
+                            mlist, 
+                            self.send
+                    )
+                except Exception as e:
+                    self.logging.critical(
+                        f"Exception on BOT callback "
+                        f"on {mlist[0]}: {e}"
+                    )
             else:
-                self.__request_new_token(
-                    chat_id,
-                    username
+                self.send(
+                    "You're not authorized to run commands",
+                    chat_id
                 )
-
-        else:
-            
-            # Otherwise if the message is not a token request
-
-            # If the chat id is a white listed chat id
-            if str(chat_id) in self.whitelist:
-                    
-                # If a callback is associated to the 
-                # incoming message, executes callback
-
-                if mlist[0] in self.callbacks.keys():
-                    try:
-                        self.callbacks[mlist[0]](
-                                chat_id, 
-                                mlist, 
-                                self.send
-                        )
-                    except Exception as e:
-                        self.logging.critical(
-                            f"Exception on BOT callback "
-                            f"on {mlist[0]}: {e}"
-                        )
      
 
     def __get_updates(self):
@@ -494,7 +428,7 @@ class Bot:
             return
 
         except Exception as e:
-            self.logging.critical("Reinitiating bot connection after Timeout")
+            self.logging.critical("Reinitiating bot connection after exception")
             self.s = r.Session()
             return
 
