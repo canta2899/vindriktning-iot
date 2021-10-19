@@ -151,6 +151,15 @@ def deltoken():
     }, 200
 
 
+@app.route("/api/whitelist")
+def whitelist():
+    wl = [val['chat_id'] for val in alltokens.values()]
+    return Response(
+        json.dumps(wl, default=defaultconverter), 
+        mimetype='application/json'
+    ), 200
+
+
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0')

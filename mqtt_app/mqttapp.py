@@ -41,6 +41,7 @@ BROKER_PASSWORD = os.environ['MOSQUITTO_PASSWORD']
 # Bot params
 TELEGRAM_BOT_TOKEN = os.environ['TELEGRAM_BOT_TOKEN'] 
 TOKEN_ENDPOINT = 'http://logapp:5000/api/validate'
+WHITELIST = 'http://logapp:5000/api/whitelist'
 LOG_ENDPOINT = 'http://logapp:5000/logging'
 
 
@@ -211,21 +212,7 @@ class Bot:
         self.s = r.Session()
         self.apisession = r.Session()
 
-        # Requests whitelist to the api
-        self.whitelist = self.__get_whitelist()
-
     
-    def __get_whitelist(self):
-        try:
-            whitelist = r.get(WHITELIST_ENDPOINT).json()
-            return whitelist
-        except Exception as e:
-            logging.error("Couldn't get whitelist for telegram bot")
-
-        return []
-
-
-
     def push_notification(self, msg):
 
         """
@@ -295,6 +282,15 @@ class Bot:
             }
         )
 
+    
+    def __get_whitelist(self):
+        try:
+            resp = self.apisession.get(WHITELIST)
+            return resp.json()
+        except Exception:
+            self.logging.error("Couldn't get whitelist")
+            self.apisession = r.Session()
+
 
     def sendall(self, msg):
 
@@ -302,7 +298,7 @@ class Bot:
             Sends a message to all the chat_ids 
         """
 
-        for chatid in self.whitelist:
+        for chatid in self.__get_whitelist():
             self.send(msg, int(chatid))
 
     
