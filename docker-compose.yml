@@ -22,8 +22,12 @@ services:
       context: .
       dockerfile: Dockerfile_logger
     container_name: logapp
+    environment:
+      - INFLUXDB_MQTT_USER=${INFLUXDB_MQTT_USER}
+      - INFLUXDB_MQTT_PASSWORD=${INFLUXDB_MQTT_PASSWORD}
     volumes:
-      - logvolume:/log
+      - logapp_tokens:/tokens
+      - logapp_logs:/log
     ports:
       - "8000:5000"
     restart: always
@@ -65,6 +69,7 @@ services:
       - "3000:3000"
 
 volumes:
-  logvolume:
+  logapp_tokens:
+  logapp_logs:
   grafana:
 

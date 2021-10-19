@@ -11,35 +11,34 @@
     <!-- Bootstrap CSS -->
     <link rel="stylesheet" href=" {{ url_for('static', filename='css/bootstrap.min.css') }} "> 
     <link rel="stylesheet" href=" {{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href=" {{ url_for('static', filename='css/morris.css') }}">
   </head>
   <body>
 
-    <div class="page-holder bg">
-        <div class="container-fluid py-5">
+    <div class="page-holder">
+        <div class="container py-5">
         <h1 class="text-center titlecolor shadow-lg">VINDRIKTNING Station</h1>
-        <h3 class="text-center text-muted">Monitoring tool</h3>
+        <h3 class="text-center">Monitoring tool</h3>
 
-        <section class="terminal-container terminal-fixed-top">
-          <header class="terminal">
-            <a class="button red" href="#"></a>
-            <a class="button yellow" href="#"></a>
-            <a class="button green" href="#"></a>
-          </header>
-        
-          <div class="terminal-home" id="contentplace"></div>
-        </section>
+        <!-- CHART HERE -->
 
+        <div id="chartContainer" class="shadow-lg border-2 rounded"></div>
         <!-- BUTTONS -->
 
         <div class="row justify-content-center">
           <div class="col-sm text-center">
-            <a name="" id="" class="btn btn-secondary btn-lg" style="width: 180px; margin-bottom: 20px;" href="/download" role="button">Get logfile</a>
+            <div class="dropdown">
+              <button class="btn btn-info dropdown-toggle btn-lg shadow-lg" type="button" id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" style="width: 180px; margin-bottom: 20px;">
+                Get logfile
+              </button>
+              <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+                <a class="dropdown-item" id="downloadCrashReport" href="/api/download/crashreport">Latest crashreport</a>
+                <a class="dropdown-item" id="downloadLogFile" href="/api/download/log">Current logfile</a>
+              </div>
+            </div>
           </div>
           <div class="col-sm text-center">
-            <button type="button" id="switchstream" class="btn btn-success btn-lg" style="width: 180px; margin-bottom: 20px;">Start streaming</button>
-          </div>
-          <div class="col-sm text-center">
-            <button type="button" id="tokensbtn" class="btn btn-secondary btn-lg" data-toggle="modal" data-target="#tokens" style="width: 180px; margin-bottom: 20px;">Manage tokens </button>
+            <button type="button" id="tokensbtn" class="btn btn-info btn-lg shadow-lg" data-toggle="modal" data-target="#tokens" style="width: 180px; margin-bottom: 20px;">Manage tokens </button>
           </div>
         </div>
 
@@ -54,27 +53,41 @@
           <div class="modal-dialog" role="document">
             <div class="modal-content">
               <div class="modal-header">
-                <h5 class="modal-title">Assigned tokens</h5>
+                <h5 class="modal-title">Tokens menu</h5>
                   <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                   </button>
               </div>
               <div class="modal-body">
                 <div class="container-fluid">
+                  <div class="row"><div class="col-sm"><h6 class="text-muted">Assign a token</h6></div></div>
                   <form id="newTokenForm">
-                    <div class="row">
+                  <div class="row">
                       <div class="col-sm">
-                        <input type="text" class="form-control" name="token_username" required="required" pattern="[A-Za-z0-9]{1,20}" placeholder="Username">
+                        <input type="text" class="form-control" name="token_username" required="required" pattern="[A-Za-z0-9_-\.]{1,20}" placeholder="Username">
                       </div>
                       <div class="col-sm">
-                        <input type="text" class="form-control" name="token_duration" required="required" pattern="[0-9]{1,3}" placeholder="Duration">
+                        <input type="text" class="form-control" name="token_duration" required="required" pattern="[0-9]{1,3}" placeholder="Days">
                       </div>
-                      <div class="col-sm">
-                        <button type="submit" class="btn btn-primary mb-2">Authorize</button>
+                      <div class="col-sm text-center">
+                        <button type="submit" class="btn btn-primary mb-2" style="width: 90px;">Authorize</button>
                       </div>
                     </div>
                   </form>
-                  <hr/>
+                  <br/>
+                  <div class="row"><div class="col-sm"><h6 class="text-muted">Revoke a token</h6></div></div>
+                  <form id="delTokenForm">
+                    <div class="row">
+                      <div class="col-8">
+                        <input type="text" class="form-control" name="token_username" required="required" pattern="[A-Za-z0-9_-\.]{1,20}" placeholder="Username">
+                      </div>
+                      <div class="col-4 text-center">
+                        <button type="submit" class="btn btn-danger mb-2" style="width: 90px;">Revoke</button>
+                      </div>
+                    </div>
+                  </form>
+                  <br/>
+                  <div class="row"><div class="col-sm"><h6 class="text-muted">Active tokens</h6></div></div>
                   <table class="table">
                     <thead>
                       <tr>
@@ -99,123 +112,9 @@
     <script src=" {{ url_for('static', filename='js/jquery-3.3.1.slim.min.js')}} "></script>
     <script src=" {{ url_for('static', filename='js/popper.min.js')}} "></script>
     <script src=" {{ url_for('static', filename='js/bootstrap.min.js') }} "></script>
-
-    <script>
-      var source;
-      var isStreaming = false;
-
-      function mapColor(stat){
-        switch(stat){
-          case "INFO":
-            return "txtinfo";
-          case "DEBUG":
-            return "txtdebug";
-          case "WARNING":
-            return "txtwarning";
-          case "ERROR":
-            return "txterror";
-          case "CRITICAL":
-            return "txtcritical";
-        }
-      }
-
-      function streamLog(){
-        console.log("Starting logfile stream");
-        source = new EventSource("/log");
-        source.onmessage = function(event) {
-          let color = mapColor(event.data.split(" : ")[1]);
-
-          $('#contentplace').prepend('<p class="console ' + color + '">'+event.data+'</p>');
-          // if(event.data == 100){
-          //   source.close();
-          // }
-        }
-      }
-
-      function stopLog(){
-        console.log("Stopping logfile stream");
-        source.close();
-      }
-
-      function getTokens(){
-        fetch('/api/tokens', {
-          method: 'GET', 
-          cache: 'no-cache',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-        }).then(r => r.json())
-          .then(val => {
-            $("tbody").html("");
-            console.log("Val received " + val);
-            val.forEach(t => {
-              if(t.expired){
-                $("tbody").append("<tr class='yellow'><td scope='row'>" + t.username + "</td><td>" + t.chat_id + "</td><td>" + t.expires + "</td></tr>");
-              }else{
-                $("tbody").append("<tr class='green'><td scope='row'>" + t.username + "</td><td>" + t.chat_id + "</td><td>" + t.expires + "</td></tr>");
-              }
-            })
-          });
-      }
-
-      $("#newTokenForm").submit(async (e) => {
-        e.preventDefault();
-        var form = document.querySelector("#newTokenForm");
-        var username = form.querySelector('input[name="token_username"]').value;
-        var duration = form.querySelector('input[name="token_duration"]').value;
-
-        console.log("Username is " + username);
-        console.log("Duration is " + duration);
-        var msg = {
-          username: username,
-          duration: parseInt(duration)
-        };
-
-        let response = await fetch('/api/newtoken', {
-                method: 'POST', 
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(msg),
-        });
-
-        let status = await response.status;
-
-        if (status == 200){
-          console.log("Added new token");
-          getTokens();
-        }else{
-          alert("Unable to add new token");
-        }
-      });
-
-      $("#switchstream").click((e) => {
-        isStreaming = !isStreaming;
-        if(isStreaming){
-          streamLog();
-          $("#switchstream").html("Stop streaming");
-        }else{
-          stopLog();
-          $("#switchstream").html("Start streaming");
-        }
-        $("#switchstream").toggleClass("btn-success");
-        $("#switchstream").toggleClass("btn-danger");
-      })
-
-      $("#tokensbtn").click((e) => {
-        getTokens()
-      });
-
-
-
-      // var source_progress = new EventSource("/progress");
-      // source_progress.onmessage = function(event) {
-      //   $('#progress').text(event.data+'%');
-      //   $('#progress').value(event.data);
-      //   if(event.data == 100){
-      //     source_progress.close()
-      //   }
-      // }
-    </script>
+    <script src=" {{ url_for('static', filename='js/raphael-min.js')}} "></script>
+    <script src=" {{ url_for('static', filename='js/morris.min.js')}}"></script>
+    <script src=" {{ url_for('static', filename='js/utils.js')}}"></script>
+    <script src=" {{ url_for('static', filename='js/chart.js')}}"></script>
   </body>
 </html>

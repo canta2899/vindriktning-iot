@@ -5,6 +5,7 @@ from datetime import datetime
 from time import sleep
 import requests as r
 from requests.exceptions import HTTPError, ConnectionError, Timeout
+import logging
 import threading
 import traceback
 import signal 
@@ -13,6 +14,9 @@ import json
 import time
 import sys
 import os
+
+#Log file path
+LOG_FILE = '/log/logfile.log'
 
 # Broker addr
 BROKER = 'broker'
@@ -45,74 +49,15 @@ WHITELIST = 'http://logapp:5000/api/whitelist'
 LOG_ENDPOINT = 'http://logapp:5000/logging'
 
 
-"""
+# Logging is a thread safe library and supports logging
+# from multiple threads (but not from multiple processes,
+# which is not this case)
 
-    A quick HTTP logger implementation that logs data to the
-    logapp VINDRIKTNING monitoring tool api. 
-
-"""
-
-class Logger:
-
-    def __init__(self, endpoint):
-
-        """
-            Uses and indipendent session to log data
-        """
-
-        self.e = endpoint
-        self.s = r.Session()
-
-
-    @staticmethod
-    def __format(msg, level="INFO"):
-        
-        """
-            Log message is sent as json 
-        """
-
-        return {
-            "msg": f"{datetime.now()} : {level} : {msg}"
-        }
-
-
-    # Log levels
-    
-    def debug(self, msg):
-        com = self.__format(msg, "DEBUG")
-        self.log(com)
-
-    def info(self, msg):
-        com = self.__format(msg, "INFO")
-        self.log(com)
-    
-    def warning(self, msg):
-        com = self.__format(msg, "WARNING")
-        self.log(com)
-
-    def error(self, msg):
-        com = self.__format(msg, "ERROR")
-        self.log(com)
-
-    def critical(self, msg):
-        com = self.__format(msg, "CRITICAL")
-        self.log(com)
-
-
-    def log(self, com):
-        
-        """
-            Logs with a post request to the given
-            endpoint
-        """
-
-        try:
-            self.s.post(self.e, json=com)
-        except Exception as e:
-            print(f"Unable to send request {com}")
-            print(e)
-
-# End class logger
+logging.basicConfig(
+    filename=LOG_FILE, 
+    level=logging.INFO,
+    format='%(asctime)s : %(levelname)s : %(message)s'
+)
 
 
 """
@@ -318,6 +263,7 @@ class Bot:
                     'username': username,
                 }
             )
+            self.logging.debug(f"VALIDATION returned status code {validation.status_code}")
         except Exception as e:
             self.logging.error(
                 f"Validation request caused exception: {e}"
@@ -809,13 +755,6 @@ signal.signal(signal.SIGINT, sigint_handler)
 signal.signal(signal.SIGTERM, sigterm_handler)
 
 
-# Offline logger just in case it's needed
-# logging.basicConfig(
-#     filename=LOG_FILE, 
-#     level=logging.INFO,
-#     format='%(asctime)s : %(levelname)s : %(message)s'
-# )
-# 
 
 # Setting up the REST logger
 
