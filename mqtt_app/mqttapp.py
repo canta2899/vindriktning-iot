@@ -153,7 +153,6 @@ class Bot:
         self.running_thread = None
         self.q = queue.Queue()
         self.max_retries = 30
-        self.logging = Logger(LOG_ENDPOINT)
         self.s = r.Session()
         self.apisession = r.Session()
 
@@ -753,13 +752,6 @@ sensor_list = dict()    # sensor_list is empty at start
 
 signal.signal(signal.SIGINT, sigint_handler)
 signal.signal(signal.SIGTERM, sigterm_handler)
-
-
-
-# Setting up the REST logger
-
-logging = Logger(LOG_ENDPOINT)
-
 
 # Configuring the telegram bot
 
