@@ -1,9 +1,8 @@
 .DS_Store
 __pycache__
-mqtt_app/env
+engine/env
 notes.txt
 .vscode
 .env
 env/
-pub.py
 reset

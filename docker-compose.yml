@@ -1,10 +1,12 @@
 version: "3"
 services:
-  mqtt_app:
+  engine:
     build:
-      context: .
-      dockerfile: Dockerfile_subscriber
+      context: ./dockerfiles
+      dockerfile: Dockerfile_engine
     container_name: mqtt_app
+    volumes:
+      - log:/log
     environment:
       - INFLUXDB_MQTT_USER=${INFLUXDB_MQTT_USER}
       - INFLUXDB_MQTT_PASSWORD=${INFLUXDB_MQTT_PASSWORD}
@@ -17,24 +19,24 @@ services:
       - "logapp"
     restart: always
 
-  logapp:
+  accesstool:
     build:
-      context: .
-      dockerfile: Dockerfile_logger
+      context: ./dockerfiles
+      dockerfile: Dockerfile_accesstool
     container_name: logapp
     environment:
       - INFLUXDB_MQTT_USER=${INFLUXDB_MQTT_USER}
       - INFLUXDB_MQTT_PASSWORD=${INFLUXDB_MQTT_PASSWORD}
     volumes:
-      - logapp_tokens:/tokens
-      - logapp_logs:/log
+      - tokens:/tokens
+      - log:/log
     ports:
       - "8000:5000"
     restart: always
 
   broker:
     build:
-      context: .
+      context: ./dockerfiles
       dockerfile: Dockerfile_broker 
     environment:
       - MOSQUITTO_USERNAME=${MOSQUITTO_USERNAME}
@@ -50,12 +52,14 @@ services:
 
   database:
     build:
-      context: .
+      context: ./dockerfiles
       dockerfile: Dockerfile_influxdb
     container_name: database
     environment:  
       - INFLUXDB_ADMIN_USER=${INFLUXDB_ADMIN_USER}
       - INFLUXDB_ADMIN_PASSWORD=${INFLUXDB_ADMIN_PASSWORD}
+    volumes:
+      - db:/var/lib/influxdb
     ports:
       - "8086:8086"
     restart: always 
@@ -69,7 +73,8 @@ services:
       - "3000:3000"
 
 volumes:
-  logapp_tokens:
-  logapp_logs:
+  log:
+  tokens:
   grafana:
+  db:
 
