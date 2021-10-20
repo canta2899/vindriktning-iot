@@ -1,6 +1,6 @@
 FROM eclipse-mosquitto
 
-ADD broker-entrypoint.sh /
+ADD ./broker/broker-entrypoint.sh /
 
 ENTRYPOINT ["sh", "./broker-entrypoint.sh"]
 
