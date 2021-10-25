@@ -2,41 +2,44 @@ version: "3"
 services:
   engine:
     build:
-      context: ./dockerfiles
+      context: .
       dockerfile: Dockerfile_engine
-    container_name: mqtt_app
-    volumes:
-      - log:/log
+    container_name: engine 
     environment:
-      - INFLUXDB_MQTT_USER=${INFLUXDB_MQTT_USER}
-      - INFLUXDB_MQTT_PASSWORD=${INFLUXDB_MQTT_PASSWORD}
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - MOSQUITTO_USERNAME=${MOSQUITTO_USERNAME}
       - MOSQUITTO_PASSWORD=${MOSQUITTO_PASSWORD}
+      - SENSOR_STATUS_ENDPOINT=${SENSOR_STATUS_ENDPOINT}
+      - DATA_ENDPOINT=${DATA_ENDPOINT}
+      - NOTIFICATION_ENDPOINT=${NOTIFICATION_ENDPOINT}
+      - AUTH_ENDPOINT=${AUTH_ENDPOINT}
+      - AUTH_APPNAME=${AUTH_APPNAME}
+      - AUTH_PASS=${AUTH_PASS}
     depends_on:
       - "broker"
-      - "database"
-      - "logapp"
+      - "monitortool"
     restart: always
 
-  accesstool:
+  monitortool:
     build:
-      context: ./dockerfiles
-      dockerfile: Dockerfile_accesstool
-    container_name: logapp
+      context: .
+      dockerfile: Dockerfile_monitortool
+    container_name: monitortool
     environment:
-      - INFLUXDB_MQTT_USER=${INFLUXDB_MQTT_USER}
-      - INFLUXDB_MQTT_PASSWORD=${INFLUXDB_MQTT_PASSWORD}
+      - INFLUXDB_API_USER=${INFLUXDB_API_USER}
+      - INFLUXDB_API_PASSWORD=${INFLUXDB_API_PASSWORD}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
     volumes:
       - tokens:/tokens
-      - log:/log
+      - ./log:/log
     ports:
       - "8000:5000"
+    depends_on:
+      - "database"
     restart: always
 
   broker:
     build:
-      context: ./dockerfiles
+      context: .
       dockerfile: Dockerfile_broker 
     environment:
       - MOSQUITTO_USERNAME=${MOSQUITTO_USERNAME}
@@ -45,14 +48,13 @@ services:
     ports:
       - "1883:1883"
     volumes:
-      - ./broker/data:/mosquitto/data
       - ./broker/config:/mosquitto/config
       - ./broker/log:/mosquitto/log
     restart: always
 
   database:
     build:
-      context: ./dockerfiles
+      context: .
       dockerfile: Dockerfile_influxdb
     container_name: database
     environment:  
@@ -73,7 +75,6 @@ services:
       - "3000:3000"
 
 volumes:
-  log:
   tokens:
   grafana:
   db:

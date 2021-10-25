@@ -1,0 +1,10 @@
+{% extends "index.html" %}
+
+{% block content %}
+<div id="chartContainer" class="mychart shadow-lg border-2 rounded"></div>
+<div id="chartContainerBar" class="mychart shadow-lg border-2 rounded"></div>
+{% endblock %}
+
+{% block script %}
+    <script src=" {{ url_for('static', filename='js/chart.js')}}"></script>
+{% endblock %}

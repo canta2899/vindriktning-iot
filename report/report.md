@@ -74,7 +74,7 @@ VINDRIKTNING non dispone, tuttavia, di ulteriori funzionalità, assestandosi in 
 In seguito all'acquisto di due unità VINDRIKTNING e ad un breve periodo di utilizzo, sulla base delle necessità individute sono stati descritti i seguenti requisiti:
 
 - Possilità di osservare e analizzare l'andamento della qualità dell'aria in un determinato lasso di tempo
-- Possibilità di aggregare i dati provenienti da più sensori collocati in diverse stanze
+- Possibilità di aggregare i dati provenienti da più sensori collocati in diverse stanze e/o diverse abitazioni
 - Facoltà di interrogare i sensori da remoto, ricevendo notifiche nel caso del superamento dei threshold specificati.
 
 ## Definizione dei principali servizi
@@ -82,13 +82,12 @@ In seguito all'acquisto di due unità VINDRIKTNING e ad un breve periodo di util
 Al fine di poter attuare gli obiettivi preposti, sono stati delineati i principali servizi necessari all'implementazione di un sistema di supporto ad un **flusso di dati** generato da **più sensori** connessi alla stessa **rete locale**. Si rende, di conseguenza, necessario lo sviluppo di:
 
 - Un **firmware personalizzato** in grado di permettere ai sensori di comunicare via rete le rilevazioni effettuate
-- Un servizio adibito alla **ricezione centralizzata dei dati** provenienti da uno o più sensori 
-- Un **database** rivolto allo storage e all'interrogazione dei dati raccolti
-- Un applicativo di alto livello che, a seguito di una configurazione da parte dell'utente, permetta la **fruizione e l'analisi dei dati raccolti** 
-- Un sistema in grado di **notificare uno o più utenti** in caso di cambiamenti notevoli. 
-- Un applicativo rivolto al **monitoraggio** e alla **configurazione** del funzionamento del sistema una volta attivato
+- Un servizio per la **ricezione centralizzata dei dati**
+- Un **database** adibito allo storage e all'interrogazione dei dati raccolti
+- Un applicativo rivolto alla **fruizione** dei dati raccolti e alla **configurazione** del sistema
+- Un servizio per **notificare uno o più utenti** in caso di cambiamenti notevoli. 
 
-Al fine di favorire in partenza lo sviluppo **indipendente** di ognuno dei servizi sopracitati, è stata addottata una strategia implementativa basata sull'organizzazione e la coordinazione di uno stack multi-container. Tramite quest'ultimi, infatti, le risorse possono essere isolate e i processi avviati e gestiti separatamente. Personalizzazioni e modifiche possono, inoltre, essere apportate senza compromettere il funzionamento complessivo del sistema.
+Al fine di favorire in partenza lo sviluppo **indipendente** di ognuno dei servizi sopracitati, è stata addottata una strategia implementativa basata sull'organizzazione e la coordinazione di molteplici container. Tramite quest'ultimi, infatti, le risorse possono essere isolate e i processi avviati e gestiti separatamente. Personalizzazioni e modifiche possono, inoltre, essere apportate senza compromettere il funzionamento complessivo del sistema.
 
 Si descrivono, di seguito, le tecnologie adottate e le implementazioni svolte al fine di attuare l'architettura descritta.
 
@@ -96,7 +95,7 @@ Si descrivono, di seguito, le tecnologie adottate e le implementazioni svolte al
 
 ## Obiettivi
 
-Al fine di permettere a VINDRKTNING una regolare comunicazione via rete della qualità dell'aria rilevata, è stata adottata una strategia basta sul **protocollo MQTT**. In questo modo, ogni sensore connesso alla rete comunica, in qualità di **publisher**, aggiornamenti costanti ad un **broker** appositamente predisposto. Tale soluzione permette, inoltre, l'introduzione di nuovi sensori senza richiedere specifiche configurazioni e/o il riavvio del sistema.
+Al fine di permettere a VINDRKTNING una regolare comunicazione via rete della qualità dell'aria rilevata, è stata adottata una strategia basata su **protocollo MQTT**. In questo modo, ogni sensore connesso alla rete comunica, in qualità di **publisher**, aggiornamenti costanti ad un **broker** appositamente predisposto. Tale soluzione permette, inoltre, l'introduzione di nuovi sensori senza richiedere specifiche configurazioni e/o il riavvio del sistema.
 
 ## Personalizzazione dell'hardware 
 
@@ -112,7 +111,7 @@ Una volta aperto il contenitore di VINDRIKTNING svitando le quattro viti che lo 
 \includegraphics[width=250px]{img/sensore1}
 \end{figure}
 
-Si osserva, inoltre, come le breakout board del microcontrollore presenti svariati pin inutilizzati, fra cui: 
+Si osserva, inoltre, come la breakout board del microcontrollore presenti svariati pin inutilizzati, fra cui: 
 
 - `+5V` e `GND` (passthru per l'alimentazione ricevuta tramite cavo USB)
 - `ISPDA` e `ISPCLK` (che forniscono una connessione ai pin SCL e SDA per la comunicazione tramite protocollo I2C)
@@ -254,11 +253,199 @@ Due ulteriori messaggi vengono, infine, comunicati al broker al momento della co
 
 Quest'ultima permette la definizione di uno specifico messaggio con flag di ritenzione attiva che viene inviato dal broker a tutti i **subscriber** in caso di una brusca ed imprevista disconnessione da parte del sensore. 
 
-Al fine di fornire ad ogni sensore un identificatore univoco per agevolarne la comunicazione con il broker, viene descritto un apposito **sensorID** costituito dalla combinazione della stringa `VINDRIKTNING-` e del **chip-id** del modulo ESP8266. Di conseguenza, nonostante il nome a livello utente sia quello dichiarato nell'apposito campo "Name", un ulteriore identificativo viene reso disponibile al fine di poter individuare rapidamente il sensore nell'insieme di quelli connessi alla rete. 
+Al fine di fornire ad ogni sensore un identificatore univoco per agevolarne la comunicazione con il broker, viene descritto un apposito **sensorID** costituito dalla stringa `VINDRIKTNING-[chip-id]`, dove `chip-id` rappresenta l'**UUID** del modulo ESP8266. Di conseguenza, nonostante il nome a livello utente sia quello dichiarato nell'apposito campo "Name", un ulteriore identificativo viene reso disponibile al fine di poter individuare rapidamente il sensore nell'insieme di quelli connessi alla rete. 
+
+Sulla base dell'identificatore univoco di ogni sensore, i topic coinvolti risultano, quindi, i seguenti:
+
+1. `airquality/[sensorID]/online` (Connessione del sensore identificato da `[sensorID]`)
+2. `airquality/[sensorID]/offline` (Disconnessione del sensore identificato da `[sensorID]`)
+1. `airquality/[sensorID]/status` (Nuova rilevazione dal sensore identificato da`[sensorID]`)
 
 \newpage
 
 # Definizione del Broker MQTT
+
+Al fine di poter comunicare i dati sulla rete, VINDRIKTNING necessita di un indirizzo valido che identifichi un **Broker MQTT** adibito alla ricezione all'eventuale ritenzione dei messaggi. A tal fine, è stata scelta l'adozione del software open source **Eclipse Mosquitto**.
+
+## Containerizzazione di Eclipse Mosquitto
+
+Sulla base delle decisioni architetturali riportate in precedenza, è stato scelto di eseguire Eclipse Mosquitto all'interno di un container **Docker**, sfruttando l'immagine ufficiale.
+
+|
+|
+
+```{dockerfile}
+FROM eclipse-mosquitto
+
+ADD ./broker/broker-entrypoint.sh /
+
+ENTRYPOINT ["sh", "./broker-entrypoint.sh"]
+
+CMD ["/usr/sbin/mosquitto", "-c", "/mosquitto/config/mosquitto.conf"]
+```
+
+|
+|
+
+A partire dall'immagine disponibile dal repository di *Docker Hub*, è stato aggiunto uno script shell per la configurazione del broker (eseguito come entrypoint all'avvio). L'esecuzione dello script (riportato di seguito) comporta:
+
+- L'attribuzione dei corretti permessi alle cartelle relative alla configurazione di Mosquitto
+- La verifica della presenza di un nome utente e una password all'avvio del container
+- La definizione delle credenziali tramite l'utility `mosquitto_passwd`
+
+|
+|
+
+```bash
+set -e
+
+# Fix write permissions for mosquitto directories
+chown --no-dereference --recursive mosquitto /mosquitto/log
+chown --no-dereference --recursive mosquitto /mosquitto/data
+
+mkdir -p /var/run/mosquitto \
+  && chown --no-dereference --recursive mosquitto /var/run/mosquitto
+
+if ( [ -z "${MOSQUITTO_USERNAME}" ] || [ -z "${MOSQUITTO_PASSWORD}" ] ); then
+  echo "MOSQUITTO_USERNAME or MOSQUITTO_PASSWORD not defined"
+  exit 1
+fi
+
+# create mosquitto passwordfile
+touch passwordfile
+mosquitto_passwd -b passwordfile $MOSQUITTO_USERNAME $MOSQUITTO_PASSWORD
+
+exec "$@"
+```
+
+|
+|
+
+Una volta eseguito, il servizio risulterà accessibile alla porta 1883 del container.
+
+
+\newpage
+
+# Ricezione dei dati
+
+## Engine
+
+La ricezione dei dati trasmessi dalle unità VINDRIKTNING è stata affidata ad un servizio denominato **Engine**. Quest'ultimo, una volta collegatosi al Broker MQTT in qualità di **subscriber** ed iscrittosi ai topic di interesse, interagisce con i dati ottenuti dai sensori connessi svolgendo le seguenti attività:
+
+- Trasmissione dei dati al servizio centralizzato di storage
+- Esecuzione di opportune routine per la notifica del superamento di determinati threshold
+
+## Containerizzazione 
+
+Il servizio è stato implementato in **Python** sfruttando le librerie **Requests** e **Paho MQTT Python Client** ed è stato, successivamente, containerizzato a partire dall'immagine **alpine** tramite il Dockerfile di seguito riportato. Quest'ultimo prevede:
+
+- L'installazione delle librerie necessarie
+- La creazione di una cartella che andrà a contenere il file di log prodotto dal programma nel corso della sua esecuzione
+- L'aggiunta del programma `engine.py` e dello script `run.sh` per la sua esecuzione all'interno del container
+- L'esecuzione del programma all'avvio del container
+
+|
+|
+
+```dockefile
+
+FROM alpine
+
+RUN apk add --update --no-cache python3
+RUN python3 -m ensurepip
+RUN pip3 install --no-cache --upgrade pip setuptools
+RUN pip3 install --no-cache --upgrade paho-mqtt
+RUN pip3 install --no-cache --upgrade requests
+RUN mkdir /log
+
+ADD ./engine/engine.py /
+ADD ./engine/run.sh /
+
+CMD ["sh", "/run.sh"]
+
+```
+
+
+|
+|
+
+Lo script `run.sh` esegue le seguenti istruzioni al fine di mantenere disponibile il logfile **antecedente** all'ultimo riavvio del sistema nel caso in cui questo sia disponibile a seguito dell'impiego di un volume persistente. In questo modo è possibile, a seguito di un riavvio improvviso, determinarne le cause consultando il file di log riportante le informazioni di interesse.
+
+|
+|
+
+```bash
+cp /log/logfile.log /log/report.log
+cat /dev/null > /log/logfile.log
+python3 /engine.py
+```
+
+|
+|
+
+Il codice sorgente dell'applicativo è consultabile al path `engine/engine.py`.
+
+\newpage
+
+# Definizione del database per lo storage dei dati
+
+Al fine di permettere il salvataggio e la successiva fruizione dei dati raccolti da VINDRIKTNING è stata impiegata una base di dati organizzata come servizio indipendente e anch'esso containerizzato. In particolare, è stato scelto l'impiego del DBMS **InfluxDB** sulla base delle seguenti necessità:
+
+- Organizzazione dei dati orientata ai **timestamp** 
+- Definizione di una **retention policy** al fine di permettere l'eliminazione dei dati al di fuori del periodo di interesse. 
+
+## Containerizzazione di InfluxDB 
+
+Al fine di rendere accessibile il servizio tramite un container Docker, è stato descritto il seguente Dockerfile (che prevede solamente l'inclusione di un opportuno script di inzializzazione all'interno dell'immagine originale).
+
+|
+|
+
+```Dockerfile
+FROM influxdb:1.8
+ADD ./influxdb/createdb.iql /docker-entrypoint-initdb.d/
+```
+
+|
+|
+
+In particolare, lo script `createdb.iql` (il cui contenuto è di seguito riportato) prevede la definizione di:
+
+- Un database denominato `airquality` con retention-policy pari a 7 giorni
+- Definizione di un utente con permessi di scrittura e lettura sulla base di dati 
+- Definizione di un utente con permessi di sola lettura sulla base di dati 
+
+|
+|
+
+```sql
+CREATE DATABASE airquality WITH DURATION 7d
+
+CREATE USER api WITH PASSWORD 'apisecret'
+
+CREATE USER reader WITH PASSWORD 'read'
+
+GRANT READ ON airquality to api 
+
+GRANT READ ON airquality to reader 
+
+GRANT WRITE ON airquality to api 
+```
+
+|
+|
+
+Una volta avviato il servizio risulterà, quindi, disponibile all'uso e accessibile alla porta **8086** del container.
+
+\newpage
+
+
+
+
+
+
+
+
 
 
 

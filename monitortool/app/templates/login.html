@@ -1,0 +1,79 @@
+{% extends "index.html" %}
+
+{% block content %}
+
+<section class="vh-100" style="padding: 50px;">
+  <div class="container py-5 h-100">
+    <div class="row d-flex justify-content-center align-items-center h-100">
+      <div class="col col-xl-10">
+        <div class="card" style="border-radius: 1rem;">
+          <div class="row g-0">
+            <div class="col-md-12 col-lg-12 d-flex align-items-center">
+            <div class="col-md-6 col-lg-5 d-none d-md-block">
+              <img
+                src="{{ url_for('static', filename='img/sensor.webp') }}"
+                alt="login form"
+                class="img-fluid" style="border-radius: 1rem 0 0 1rem;"
+              />
+            </div>
+              <div class="card-body p-4 p-lg-5 text-black">
+
+                <form id="loginForm">
+
+                  <div class="form-outline mb-4">
+                    <input type="text" id="username" placeholder="Username" class="form-control form-control-lg" />
+                  </div>
+
+                  <div class="form-outline mb-4">
+                    <input type="password" id="password" placeholder="Password" class="form-control form-control-lg" />
+                  </div>
+
+                  <div class="pt-1 mb-4">
+                    <button class="btn btn-dark btn-lg btn-block" type="sumbit">Login</button>
+                  </div>
+                </form>
+
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% endblock %}
+
+
+{% block script %}
+<script>
+    $("#loginForm").submit(async (e) => {
+        e.preventDefault();
+        var form = document.querySelector("#loginForm");
+        var username = form.querySelector('input[id="username"]').value;
+        var password = form.querySelector('input[id="password"]').value;
+
+        var msg = {
+            username: username,
+            password: password
+        };
+
+        let response = await fetch('/auth', {
+            method: 'POST', 
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(msg),
+        });
+
+        let status = await response.status;
+
+        if (status == 200){
+            console.log("ok");
+            window.location.replace("/");
+        }else{
+            alert("Not authorized");
+        }
+    });
+</script>
+{% endblock %}

@@ -46,7 +46,8 @@ This code was heavily inspired by Hypfer: https://github.com/Hypfer/esp8266-vind
 
 
 char sensorID[32];                          /* Buffer that contains the sensore UID */
-char MQTT_TOPIC_AVAILABILITY[128];          /* Avaiability message for MQTT */
+char MQTT_TOPIC_ONLINE[128];                /* Avaiability message for MQTT */
+char MQTT_TOPIC_OFFLINE[128];               /* Avaiability message for MQTT */
 char MQTT_TOPIC_STATE[128];                 /* State message for MQTT */
 char MQTT_TOPIC_CONFIG[128];                /* Config message for MQTT */
 
@@ -154,10 +155,11 @@ void mqttReconnect()
 //   // Tries to connect three times
 
   for (uint8_t attempt = 0; attempt < 3; ++attempt) {
-    if (mqttClient.connect(sensorID, Config::username, Config::password, MQTT_TOPIC_AVAILABILITY, 1, true, OFFLINE)) {
+    // Changing qos to 0
+    if (mqttClient.connect(sensorID, Config::username, Config::password, MQTT_TOPIC_OFFLINE, 0, true, Config::name)) {
         // If connection is successful, declares itself available to the broker which will handle the message
         // differently is the sensor is a known one or a new one
-        mqttClient.publish(&MQTT_TOPIC_AVAILABILITY[0], ONLINE, true);
+        mqttClient.publish(&MQTT_TOPIC_ONLINE[0], Config::name, true);
 
         // publishConfiguration();
         // Make sure to subscribe after polling the status so that we never execute commands with the default data
@@ -204,7 +206,8 @@ void setup()
 
   // fills the mqtt topics and the sensorID according to the ESP's chipId
   snprintf(sensorID, sizeof(sensorID), "VINDRIKTNING-%X", ESP.getChipId());;
-  snprintf(MQTT_TOPIC_AVAILABILITY, sizeof(MQTT_TOPIC_AVAILABILITY), "airsensor/%s/availability", sensorID);
+  snprintf(MQTT_TOPIC_ONLINE, sizeof(MQTT_TOPIC_ONLINE), "airsensor/%s/online", sensorID);
+  snprintf(MQTT_TOPIC_OFFLINE, sizeof(MQTT_TOPIC_OFFLINE), "airsensor/%s/offline", sensorID);
   snprintf(MQTT_TOPIC_STATE, sizeof(MQTT_TOPIC_STATE), "airsensor/%s/state", sensorID);
 
   // Sets up the serial communication with the sensor
