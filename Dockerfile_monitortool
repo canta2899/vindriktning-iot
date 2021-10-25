@@ -20,8 +20,11 @@ RUN mkdir /log
 WORKDIR /app
 
 COPY ./monitortool/app /app
+COPY ./monitortool/entrypoint.sh /entrypoint.sh
 
 RUN export FLASK_APP=app.py
 RUN export FLASK_ENV=development
+
+ENTRYPOINT ["sh", "/entrypoint.sh"]
 
 CMD ["flask", "run", "--host=0.0.0.0"]

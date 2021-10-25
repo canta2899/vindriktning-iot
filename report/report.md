@@ -359,9 +359,11 @@ RUN pip3 install --no-cache --upgrade requests
 RUN mkdir /log
 
 ADD ./engine/engine.py /
-ADD ./engine/run.sh /
+ADD ./engine/entrypoint.sh /
 
-CMD ["sh", "/run.sh"]
+ENTRYPOINT ["sh", "/entrypoint.sh"]
+
+CMD ["python3", "/engine.py"]
 
 ```
 

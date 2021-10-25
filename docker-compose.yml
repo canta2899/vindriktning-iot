@@ -13,7 +13,7 @@ services:
       - NOTIFICATION_ENDPOINT=${NOTIFICATION_ENDPOINT}
       - AUTH_ENDPOINT=${AUTH_ENDPOINT}
       - AUTH_APPNAME=${AUTH_APPNAME}
-      - AUTH_PASS=${AUTH_PASS}
+      - AUTH_APPPASS=${AUTH_APPPASS}
     depends_on:
       - "broker"
       - "monitortool"
@@ -28,9 +28,10 @@ services:
       - INFLUXDB_API_USER=${INFLUXDB_API_USER}
       - INFLUXDB_API_PASSWORD=${INFLUXDB_API_PASSWORD}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-    volumes:
-      - tokens:/tokens
-      - ./log:/log
+      - AUTH_APPNAME=${AUTH_APPNAME}
+      - AUTH_APPPASS=${AUTH_APPPASS}
+      - AUTH_USERNAME=${AUTH_USERNAME}
+      - AUTH_USERPASS=${AUTH_USERPASS}
     ports:
       - "8000:5000"
     depends_on:

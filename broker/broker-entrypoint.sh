@@ -20,13 +20,3 @@ mosquitto_passwd -b passwordfile $MOSQUITTO_USERNAME $MOSQUITTO_PASSWORD
 
 exec "$@"
 
-
-
-
-
-# Test
-# Subscribe to topic.
-# mosquitto_sub -h localhost -t test -u "mosquitto" -P "mosquitto"
-
-# Publish a message.
-# mosquitto_pub -h localhost -t test -m "hello." -u "mosquitto" -P "mosquitto"

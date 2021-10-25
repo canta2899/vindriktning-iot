@@ -3770,3 +3770,97 @@
 1635117885: New client connected from 172.31.0.6:42585 as auto-98D696D1-4ABA-74E3-37ED-E56C0BEE0155 (p2, c1, k60, u'mosquitto').
 1635119681: Saving in-memory database to /mosquitto/data/mosquitto.db.
 1635121480: Saving in-memory database to /mosquitto/data/mosquitto.db.
+1635196650: mosquitto version 2.0.12 starting
+1635196650: Config loaded from /mosquitto/config/mosquitto.conf.
+1635196650: Opening ipv4 listen socket on port 1883.
+1635196650: Opening ipv6 listen socket on port 1883.
+1635196650: mosquitto version 2.0.12 running
+1635196695: mosquitto version 2.0.12 starting
+1635196695: Config loaded from /mosquitto/config/mosquitto.conf.
+1635196695: Opening ipv4 listen socket on port 1883.
+1635196695: Opening ipv6 listen socket on port 1883.
+1635196695: mosquitto version 2.0.12 running
+1635196918: mosquitto version 2.0.12 starting
+1635196918: Config loaded from /mosquitto/config/mosquitto.conf.
+1635196918: Opening ipv4 listen socket on port 1883.
+1635196918: Opening ipv6 listen socket on port 1883.
+1635196918: mosquitto version 2.0.12 running
+1635196921: New connection from 192.168.0.1:58130 on port 1883.
+1635196921: New client connected from 192.168.0.1:58130 as VINDRIKTNING-54F9AE (p2, c1, k10, u'mosquitto').
+1635196979: mosquitto version 2.0.12 starting
+1635196979: Config loaded from /mosquitto/config/mosquitto.conf.
+1635196979: Opening ipv4 listen socket on port 1883.
+1635196979: Opening ipv6 listen socket on port 1883.
+1635196979: mosquitto version 2.0.12 running
+1635196981: New connection from 192.168.0.1:58142 on port 1883.
+1635196981: New client connected from 192.168.0.1:58142 as VINDRIKTNING-54F9AE (p2, c1, k10, u'mosquitto').
+1635198058: mosquitto version 2.0.12 starting
+1635198058: Config loaded from /mosquitto/config/mosquitto.conf.
+1635198058: Opening ipv4 listen socket on port 1883.
+1635198058: Opening ipv6 listen socket on port 1883.
+1635198058: mosquitto version 2.0.12 running
+1635198297: mosquitto version 2.0.12 starting
+1635198297: Config loaded from /mosquitto/config/mosquitto.conf.
+1635198297: Opening ipv4 listen socket on port 1883.
+1635198297: Opening ipv6 listen socket on port 1883.
+1635198297: mosquitto version 2.0.12 running
+1635198301: New connection from 192.168.32.1:61510 on port 1883.
+1635198301: New client connected from 192.168.32.1:61510 as VINDRIKTNING-54F9AE (p2, c1, k10, u'mosquitto').
+1635198312: mosquitto version 2.0.12 terminating
+1635198312: Saving in-memory database to /mosquitto/data/mosquitto.db.
+1635198396: mosquitto version 2.0.12 starting
+1635198396: Config loaded from /mosquitto/config/mosquitto.conf.
+1635198396: Opening ipv4 listen socket on port 1883.
+1635198396: Opening ipv6 listen socket on port 1883.
+1635198396: mosquitto version 2.0.12 running
+1635198398: New connection from 192.168.32.6:35995 on port 1883.
+1635198398: New client connected from 192.168.32.6:35995 as auto-1071CA40-9DD6-8390-BA4E-6CF88BD3CBA9 (p2, c1, k60, u'mosquitto').
+1635198416: New connection from 192.168.32.1:61590 on port 1883.
+1635198416: New client connected from 192.168.32.1:61590 as VINDRIKTNING-54F9AE (p2, c1, k10, u'mosquitto').
+1635198754: Client auto-1071CA40-9DD6-8390-BA4E-6CF88BD3CBA9 closed its connection.
+1635198765: mosquitto version 2.0.12 starting
+1635198765: Config loaded from /mosquitto/config/mosquitto.conf.
+1635198765: Opening ipv4 listen socket on port 1883.
+1635198765: Opening ipv6 listen socket on port 1883.
+1635198765: mosquitto version 2.0.12 running
+1635198767: New connection from 192.168.32.6:35009 on port 1883.
+1635198767: New client connected from 192.168.32.6:35009 as auto-AAD4B485-DC14-BC48-174D-593142B131C6 (p2, c1, k60, u'mosquitto').
+1635198814: New connection from 192.168.32.1:59984 on port 1883.
+1635198814: New client connected from 192.168.32.1:59984 as VINDRIKTNING-54F9AE (p2, c1, k10, u'mosquitto').
+1635199081: mosquitto version 2.0.12 starting
+1635199081: Config loaded from /mosquitto/config/mosquitto.conf.
+1635199081: Opening ipv4 listen socket on port 1883.
+1635199081: Opening ipv6 listen socket on port 1883.
+1635199081: mosquitto version 2.0.12 running
+1635199083: New connection from 192.168.32.6:42215 on port 1883.
+1635199083: New client connected from 192.168.32.6:42215 as auto-87B2FE98-E989-FCD8-A534-E2F2B0EA0EE5 (p2, c1, k60, u'mosquitto').
+1635199114: New connection from 192.168.32.1:60210 on port 1883.
+1635199114: New client connected from 192.168.32.1:60210 as VINDRIKTNING-54F9AE (p2, c1, k10, u'mosquitto').
+1635199193: mosquitto version 2.0.12 starting
+1635199193: Config loaded from /mosquitto/config/mosquitto.conf.
+1635199193: Opening ipv4 listen socket on port 1883.
+1635199193: Opening ipv6 listen socket on port 1883.
+1635199193: mosquitto version 2.0.12 running
+1635199195: New connection from 192.168.32.6:50587 on port 1883.
+1635199195: New client connected from 192.168.32.6:50587 as auto-74C7054C-498B-C65F-A4E1-DE181363FEAD (p2, c1, k60, u'mosquitto').
+1635199196: New connection from 192.168.32.1:60438 on port 1883.
+1635199196: New client connected from 192.168.32.1:60438 as VINDRIKTNING-54F9AE (p2, c1, k10, u'mosquitto').
+1635200972: mosquitto version 2.0.12 starting
+1635200972: Config loaded from /mosquitto/config/mosquitto.conf.
+1635200972: Opening ipv4 listen socket on port 1883.
+1635200972: Opening ipv6 listen socket on port 1883.
+1635200972: mosquitto version 2.0.12 running
+1635200974: New connection from 192.168.32.6:48069 on port 1883.
+1635200974: New client connected from 192.168.32.6:48069 as auto-11815446-A77A-9005-DEC5-4CA50843E185 (p2, c1, k60, u'mosquitto').
+1635200981: New connection from 192.168.32.1:60684 on port 1883.
+1635200981: New client connected from 192.168.32.1:60684 as VINDRIKTNING-54F9AE (p2, c1, k10, u'mosquitto').
+1635201574: mosquitto version 2.0.12 starting
+1635201574: Config loaded from /mosquitto/config/mosquitto.conf.
+1635201574: Opening ipv4 listen socket on port 1883.
+1635201574: Opening ipv6 listen socket on port 1883.
+1635201574: mosquitto version 2.0.12 running
+1635201576: New connection from 192.168.32.6:47325 on port 1883.
+1635201576: New client connected from 192.168.32.6:47325 as auto-3AF22BE8-F21B-4B7D-A4A6-ADED3F0555A1 (p2, c1, k60, u'mosquitto').
+1635201578: New connection from 192.168.32.1:61456 on port 1883.
+1635201578: New client connected from 192.168.32.1:61456 as VINDRIKTNING-54F9AE (p2, c1, k10, u'mosquitto').
+1635203373: Saving in-memory database to /mosquitto/data/mosquitto.db.

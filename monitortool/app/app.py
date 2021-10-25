@@ -20,7 +20,7 @@ from flask_jwt_extended import (
     unset_jwt_cookies
 )
 
-from flask_jwt_extended.utils import set_access_cookies
+from flask_jwt_extended.utils import get_current_user, get_jwt_header, set_access_cookies
 from werkzeug.utils import redirect
 
 from secrets import token_urlsafe
@@ -31,6 +31,13 @@ import json
 import os
 
 from bot import Bot
+
+APP_NAME = os.environ['AUTH_APPNAME']
+APP_SECRET = os.environ['AUTH_APPPASS']
+APP_ID = "engineapp"
+
+# APP_NAME = 'prova'
+# APP_SECRET = 'test'
 
 TOKENS_FILE = '/tokens/tokens.json'
 INFLUX_DB_DATABASE = 'airquality'
@@ -45,14 +52,15 @@ TELEGRAM_BOT_TOKEN = os.environ['TELEGRAM_BOT_TOKEN']
 # INFLUX_DB_PASSWORD = 'bridge'
 # INFLUX_DB_HOST = 'localhost'         
 # INFLUX_DB_PORT = 8086
-# TELEGRAM_BOT_TOKEN = '2062157501:AAHNtFKQuYq6wHzdCrwmYtFfwlgGgex7gcc'
+# TELEGRAM_BOT_TOKEN = '2097018200:AAHoG4d1yd530euFuCFBRS6AEQ-HeGwzgkY'
 
-LINE = 'select mean("pm25"), "name" from "airquality" where time > now() - 24h group by time(2m) fill(none)'
+
+
+LINE = 'select mean("pm25") from "airquality" where time > now() - 24h group by time(2m) fill(none)'
 BAR = 'select mean("pm25") from "airquality" where time > now() - 24h group by "name"'
 
 app = Flask(__name__)
 jwt = JWTManager(app)
-
 
 app.config["JWT_COOKIE_SECURE"] = False  # true in production
 app.config["JWT_TOKEN_LOCATION"] = ["headers", "cookies"]
@@ -72,19 +80,14 @@ db = SQLAlchemy(app)
 # Defining database models
 
 class User(db.Model):
-    name = db.Column(db.String(50), primary_key=True)
+    id = db.Column(db.Integer, db.Sequence('user_id_seq'), primary_key=True)
+    name = db.Column(db.String(50), unique=True)
     password = db.Column(db.String(80))
 
 class TelegramUser(db.Model):
-    id = db.Column(db.Integer, db.Sequence('user_id_seq'), primary_key=True)
-    username = db.Column(db.String(50))
+    username = db.Column(db.String(50), primary_key=True)
     chat_id = db.Column(db.Integer, nullable=True)
     # expiration = db.Column(db.DateTime, default=datetime.utcnow())
-
-class Application(db.Model):
-    name = db.Column(db.String(50), primary_key=True)
-    secret = db.Column(db.String(32), unique=True)
-    description = db.Column(db.String(100))
 
 
 def bind_callback(chat_id, username, params):
@@ -197,9 +200,9 @@ def info_callback(chat_id, _, params):
     q = data[0]
     
     quality = ""
-    if q['quality'] == 2:
+    if q['quality'] == '2':
         quality = "🔴"
-    elif q['quality'] == 1:
+    elif q['quality'] == '1':
         quality = "🟠"
     else:
         quality = "🟢"
@@ -212,7 +215,6 @@ def info_callback(chat_id, _, params):
         f"Value: {value}", 
         [chat_id]
     )
-
 
 
 # Starts telegram bot definind callbacks endpoints
@@ -295,10 +297,35 @@ def defaultconverter(o):
 #         return response
 #     except (RuntimeError, KeyError):
 #         return response
+
+def is_from_browser(user_agent):
+    return user_agent.browser in [
+        "camino",
+        "chrome",
+        "firefox",
+        "galeon",
+        "kmeleon",
+        "konqueror",
+        "links",
+        "lynx",
+        "msie",
+        "msn",
+        "netscape",
+        "opera",
+        "safari",
+        "seamonkey",
+        "webkit",
+    ] 
  
 @app.errorhandler(404)
 def page_not_found(e):
     return render_template('404.html'), 404
+
+@jwt.expired_token_loader
+def my_expired_token_callback(jwt_header, jwt_payload):
+    if is_from_browser(request.user_agent):
+        return render_template('login.html', logged=False)
+    return jsonify({'msg': 'Token has expired'}), 401
 
 @app.route('/')
 @jwt_required(optional=True)
@@ -343,7 +370,7 @@ def databar():
     """
         Returns data in order to produce bar plot if 
         the requestor is authorized
-    """
+    """ 
 
     res = get_influx().query(BAR)
     if not res:
@@ -364,8 +391,9 @@ def airquality():
     """
         Received air quality update from authorized
         applications. Then, performs database logging
-
     """
+
+    current_identity = get_jwt_identity()
 
     try:
         new_status = request.get_json()
@@ -384,6 +412,8 @@ def newtoken():
     """
         Adds a new telegram user to the database
     """
+
+    current_identity = get_jwt_identity()
 
     try:
         jreq = request.get_json()
@@ -411,7 +441,9 @@ def deltoken():
     """
         Removes a telegram user from the database
     """ 
-    
+
+    current_identity = get_jwt_identity()
+
     try:
         jreq = request.get_json()
         username = jreq['username']
@@ -453,10 +485,10 @@ def telegram():
     """
 
     current_identity = get_jwt_identity()
+
     if current_identity:
         return render_template('telegram.html', logged=True)
-    else:
-        return render_template('login.html', logged=False)
+    return render_template('login.html', logged=False)
 
 
 @app.route("/api/auth", methods=['POST'])
@@ -473,96 +505,11 @@ def auth_api():
     except Exception as e:
         return jsonify({'msg': 'Bad request'}), 400
 
-    # searches for a matching app
-    req_app = Application.query.filter_by(name=appname, secret=secret).first()
-
-    # Error if not found 
-    if not req_app:
-        return jsonify({'message': 'Invalid authentication'}), 401
+    if appname == APP_NAME and secret == APP_SECRET:
+        access_token = create_access_token(identity=APP_ID)
+        return jsonify({'access_token': access_token}), 200
     
-    # Otherwise returs a token
-    access_token = create_access_token(identity=req_app.name)
-    return jsonify({'access_token': access_token}), 200
-
-
-@app.route("/api/apps", methods=['GET'])
-@jwt_required()
-def get_apps():
-
-    """
-        Returns app list to authorized requestor
-    """
-
-    apps = Application.query.all()
-    response = [{'name': app.name, 'description': app.description, 'secret': app.secret} for app in apps]
-    return jsonify(response), 200
-
-
-@app.route("/api/newapp", methods=['POST'])
-@jwt_required()
-def new_app():    
-
-    """
-        Creates a new app
-    """
-    
-    try:
-        jreq = request.get_json()
-        name = jreq['name']
-        desc = jreq['description']
-    except Exception: 
-        return jsonify({'msg': 'Bad request'}), 400
-
-    app = Application.query.filter_by(name=name).first()
-    
-    if not app:
-        secret = token_urlsafe(32)
-        a = Application(name=name, description=desc, secret=secret)
-        db.session.add(a)
-        db.session.commit()
-        return jsonify({'name': name, 'description': desc, 'secret': secret}), 200
-    
-    return jsonify({'msg': 'Resource already exists!'}), 403
-    
-
-@app.route("/api/delapp", methods=['POST'])
-@jwt_required()
-def del_app():
-
-    """
-        Deletes an app with the given name
-    """    
-    
-    try:
-        jreq = request.get_json()
-        name = jreq['name']
-    except Exception as e:
-        return jsonify({'msg': 'Bad request'}), 400        
-        
-    app = Application.query.filter_by(name=name).first()
-    
-    if not app:
-        return jsonify({'msg': 'App not found!'}), 409
-
-    db.session.delete(app)
-    db.session.commit()
-    return jsonify({'msg': 'ok'}), 200
-
-
-@app.route("/apps")
-@jwt_required(optional=True)
-def apps():
-
-    """
-        Returns app list page if the user is authorized.
-        Otherwise redirects to the login endpoint
-    """
-
-    current_identity = get_jwt_identity()
-    if current_identity:
-        return render_template('apps.html', logged=True)
-    else:
-        return render_template('login.html', logged=False)
+    return jsonify({'msg': 'Not Authorized'}), 401
 
 
 @app.route("/auth", methods=['POST'])
@@ -575,21 +522,20 @@ def auth():
 
     try:
         jreq = request.get_json()
-
         username = jreq['username']
         password = jreq['password']
     except Exception as e:
         return jsonify({'msg': 'Bad request'}), 400        
     
+    # TODO check if user is valid and produce access token
     user = User.query.filter_by(name=username, password=password).first()
 
     if not user:
         return jsonify({'message': 'Unknown user'}), 401
     
     response = jsonify({"msg": "login successful"})
-    access_token = create_access_token(identity=user.name)
+    access_token = create_access_token(identity=user.id)
     set_access_cookies(response, access_token)
-
     return response
 
 @app.route("/login", methods=['GET'])
@@ -598,6 +544,11 @@ def login():
     """
         Renders login page template
     """
+    current_identity = get_jwt_identity()
+    if current_identity[0] != 'u':
+        return jsonify({'msg': 'Unathorized endpoint'}), 401
+    
+    # useridentity = User.query.filter_by(username=current_identity[2:]).first()
     
     return render_template('login.html')
 
@@ -624,7 +575,7 @@ def status():
         source and updates sensor status locally
     """
     
-    current_user = get_jwt_identity()
+    current_identity = get_jwt_identity()
 
     try:
         jreq = request.get_json()
@@ -655,6 +606,7 @@ def notify_bot():
         source and triggers a bot notification to all the
         binded users
     """
+    current_identity = get_jwt_identity()
 
     try:
         jreq = request.get_json()

@@ -233,6 +233,9 @@ class Bot:
                 timeout=20
             ).json()
 
+            
+            print(f"Receiving {up}")
+
         except ValueError as e:
             return
 
@@ -275,7 +278,8 @@ class Bot:
             After each polling, enqueued notifications are sent
         """
 
-        while self.__check_polling():
+        #while self.__check_polling():
+        while self.polling:
             try:
                 self.__get_updates()
                 self.__send_notifications()

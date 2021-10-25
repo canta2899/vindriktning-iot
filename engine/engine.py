@@ -1,7 +1,9 @@
 import paho.mqtt.client as paho
 import requests as r
+from requests import ConnectionError
 import logging
 import signal 
+import time
 import json
 import sys
 import os
@@ -20,7 +22,8 @@ TOPIC = 'airsensor/#'
 
 
 AUTH_APPNAME=os.environ['AUTH_APPNAME']
-AUTH_PASS=os.environ['AUTH_PASS']
+AUTH_PASS=os.environ['AUTH_APPPASS']
+
 BROKER_USER = os.environ['MOSQUITTO_USERNAME'] 
 BROKER_PASSWORD = os.environ['MOSQUITTO_PASSWORD']
 SENSOR_STATUS_ENDPOINT = os.environ['SENSOR_STATUS_ENDPOINT']
@@ -36,8 +39,7 @@ class ApiComm:
         self.AUTH_APPNAME = name
         self.AUTH_PASS = key
         self.session = r.Session()
-        if not self.__getAccessToken():
-            raise Exception("Request for access token failed.")
+        self.__getAccessToken()
 
     def __getAccessToken(self):
 
@@ -50,15 +52,19 @@ class ApiComm:
                 'appName': self.AUTH_APPNAME,
                 'secret': self.AUTH_PASS
             })
-            request.raise_for_status()
+        except ConnectionError as e:
+            logging.error("Connection error happened while requesting access token. Sleeping 10 seconds")
+            time.sleep(10)
         except Exception as e:
-            print(e)
+            logging.error(f"Couldn't get access token: {e}")
             return False 
-        else:
-            resp = request.json()
-            token = resp['access_token']
-            self.session.headers.update({'Authorization': f'Bearer {token}'})
-            return True 
+
+        if request.status_code == 401:
+            raise Exception("Unable to authenticate")
+        resp = request.json()
+        token = resp['access_token']
+        self.session.headers.update({'Authorization': f'Bearer {token}'})
+        return True 
 
     def makerequest(self, endpoint, msg):
 
@@ -75,9 +81,12 @@ class ApiComm:
                     res = self.session.post(self.DATA_ENDPOINT, json=msg)
                     if res.status_code == 200:
                         return True 
-                return False
+        except ConnectionError as e:
+            logging.critical(f"Connection error happened while performing request {msg} to {endpoint}")
         except Exception as e:
             logging.critical(f"Unable to send {msg} to {endpoint}: {e}")
+
+        return False
              
 
 def declare_sensor_status(uid, name, status):
@@ -94,7 +103,7 @@ def declare_sensor_status(uid, name, status):
     }
 
     if not comm.makerequest(SENSOR_STATUS_ENDPOINT, msg):
-        logging.critical("Couldn't get token for status request. Skipping...")
+        logging.critical("Couldn't perform status request. Skipping...")
 
 
 
@@ -146,7 +155,7 @@ def update_values(uid, pm25, quality, name, ip):
 
         # Triggers a notification on the api 
         if not comm.makerequest(NOTIFICATION_ENDPOINT, {'msg': msg}):
-            logging.critical("Couldn't get token for notification request. Skipping...")
+            logging.critical("Couldn't perform notification request. Skipping...")
         
             
 
@@ -269,7 +278,7 @@ logging.basicConfig(
 try:
     comm = ApiComm(AUTH_APPNAME, AUTH_PASS)
 except Exception as e:
-    logging.critical("Can't get a valid token from the api. Closing...")
+    logging.critical("Can't authenticate to the api. Closing...")
     sys.exit(1)
 
 sensor_list = dict()    # sensor_list is empty at start
@@ -300,4 +309,3 @@ logging.info("Configuration done, starting main loop")
 
 # Runs forever until stop occours
 mqtt_client.loop_forever() 
-
