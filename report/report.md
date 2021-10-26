@@ -481,7 +481,7 @@ GRANT WRITE ON airquality to api
 |
 |
 
-Una volta avviato, il servizio risulterà disponibile all'uso e accessibile tramite la porta **8086** del container.
+Una volta avviato, il servizio risulterà disponibile all'uso ed accessibile tramite la porta **8086** del container.
 
 \newpage
 
@@ -519,6 +519,13 @@ Il bot reagisce ad alcuni messaggi inviati dall’utente con le seguenti modalit
 In aggiunta a questo messaggio l’utente riceverà anche una legenda per interpretare la qualità notificata, lo stesso presente sul sensore fisico in quel momento. Nel caso in cui all’utente non sia associato alcun sensore oppure il nome riportato da questo non sia corretto, il bot provvederà a inviare un messaggio d’errore nel quale viene specificata la ragione.
 
 Le comunicazioni del sistema tuttavia non si limitano alla necessità d’intervento da parte dell’utente. Infatti, una volta avviato il bot nella maniera sopra indicata, l’utente riceverà delle notifiche nel caso in cui la qualità dell’aria all’interno della stanza dovesse cambiare. Ciò avviene quando il valore misurato dal sensore supera una certa soglia per la quale ne consegue il cambiamento del colore identificativo della qualità rilevata. L’utente e chiunque sia collegato al sensore, riceverà quindi una notifica nella quale lo si avvisa della variazione suggerendo, in caso di necessità, delle azioni da eseguire per migliorare la situazione.
+
+```{=latex}
+% Primo utente amministratore creato quando viene istanziato il container sulla base delle variabili ambientali definite
+% Gli utenti amministratori possono aggiungere utenti telegram e aggiungere utenti per il monitoring tool
+% Gli utenti non amministratori possono accedere solamente alla pagina dei grafici
+% L'amministratore abilita un utente telegram alla comunicazione con il bot, ma è l'utente a "bindarsi" al fine di abilitare la ricezione di notifiche. Questo permette una sicurezza da ambo i lati per evitare che utenti estranei possano parlare con il bot e per evitare che il bot possa inviare messaggi ad utenti che non li desiderano
+```
 
 
 
