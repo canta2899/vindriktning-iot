@@ -127,7 +127,7 @@ Si osserva, inoltre, come la breakout board del microcontrollore presenti svaria
 Risulta, di conseguenza, possibile la connessione di un'unità esterna che, una volta saldata ai pin di alimentazione (`+5V` e `GND`) e al test point seriale `REST`, permette l'acquisizione del valore rilevato dal sensore **PM1006** e letto dal microcontrollore originale. In particolare, è stata selezionata un'unità **ESP8266** (nello specifico, un clone del **D1 Mini by Wemos** prodotto da AZDelivery), che in dimensioni estremamente ridotte fornisce:
 
 - La possibilità di essere alimentata a 5V grazie al regolatore di tensione built-in (e quindi di ricevere la corrente di alimentazione direttamente dalla porta USB di VINDRIKTNING)
-- La connettività via Wi-Fi in modalità Access Point e Station Mode, entrambe necessarie allo sviluppo previsto. 
+- La connettività via Wi-Fi in modalità Access Point e Station Mode, entrambe necessarie allo sviluppo previsto 
 - La possibilità di essere programmato tramite il framework **Arduino**, con il conseguente accesso alla moltitudine di librerie disponibili in rete
 
 Cavi dupont appositamente modificati sono stati saldati ai punti di accesso citati in precedenza, ottenendo il seguente risultato. 
@@ -146,7 +146,7 @@ Infine, i seguenti pin del modulo D1 mini sono stati impiegati per effettuare la
 
 \newpage
 
-VINDRIKTNING permette, infine, l'alloggiamento del modulo al suo interno, grazie alla moltitudine di spazio disponibile. 
+VINDRIKTNING permette, infine, l'alloggiamento del modulo al suo interno, grazie all'ampio spazio disponibile. 
 
 \begin{figure}[H]
 \centering
@@ -206,7 +206,7 @@ Il namespace `SerialCom` contenuto all'interno dell'header file `Utils.h` fornis
 
 - Leggere i dati dalla porta seriale (configurata tramite SoftwareSerial sul pin 2D del modulo ESP8266) all'interno di un buffer
 - Effettuare cinque letture consecutive del valore di qualità dell'aria, calcolandone la media
-- Individuare la classa di qualità alla quale appartiene il valore medio rilevato
+- Individuare la classe di qualità alla quale appartiene il valore medio rilevato
 - Verificare la validità dell'header (i cui tre byte devono corrispondere a `0x16 0x11 0x0B`)
 - Verificare la validità del checksum (la somma dei venti byte deve essere pari a 0)
 
@@ -240,7 +240,7 @@ La risposta ottenuta dipende dalla configurazione di ArduinoOTA all'interno dell
 \includegraphics[width=500px]{img/arduinoOTA.png}
 \end{figure}
 
-Al fine di prevenire upload accidentali, è stata definita definita una password che viene richiesta per completare la procedura di aggiornamento.
+Al fine di prevenire upload accidentali, è stata definita una password che viene richiesta per completare la procedura di aggiornamento.
 
 ### Configurazione di parametri personalizzati
 
