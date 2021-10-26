@@ -153,6 +153,26 @@ VINDRIKTNING permette, infine, l'alloggiamento del modulo al suo interno, grazie
 \includegraphics[width=300px]{img/full.jpeg}
 \end{figure}
 
+## Costo di realizzazione
+
+Le modifiche apportate hanno coinvolto l'utilizzo dei seguenti materiali: 
+
+- Unità VINDRIKTNING originale
+- Cavi dupont
+- Cacciavite di tipo `PH0` per l'apertura del vano posteriore 
+- Strumentazione per la saldatura
+- Modulo ESP8266 (D1 Mini by Wemos)
+
+Al netto dell'attrezzatura già in possesso, il costo necessario all'apporto delle modifiche sopracitate viene di seguito descritto:
+
+| Componente | Costo Individuale | Quantità acquistate |
+|------------|------------------:|--------------------:|
+| VINDRIKTNING |  9,95 €         |     2               |
+| D1 Mini    |    4,00 €         |     2               |
+| Cavi Dupont|    3,00 €         |     1               |
+
+Il costo coinvolto nella personalizzazione di una singola unità VINDRIKTNING corrisponde, quindi, alla cifra di **16,95 €**. La personalizzazione di due unità richiede, invece, una spesa complessiva pari a **30,90 €**.
+
 ## Implementazione di un firmware ad-hoc
 
 A seguito dell'installazione del modulo D1 Mini è stato sviluppato un firmware parzialmente ispirato a quello proposto da Sören Beye, con l'obiettivo di fornire le seguenti funzionalità: 
@@ -205,7 +225,7 @@ Ciò è reso possibile dalla libreria **LittleFS**, che permette l'indicizzazion
 
 ### Aggiornamento del firmware da remoto
 
-L'aggiornamento via rete del firmware è stato reso possibile dalla libreria **ArduinoOTA** (On The Air), che permette di istruire il microcontrollore alla ricezione di nuovi binari precompilati tramite una socket TCP appositamente aperta.
+L'aggiornamento via rete del firmware è reso possibile dalla libreria **ArduinoOTA** (On The Air), che permette di istruire il microcontrollore alla ricezione di nuovi binari precompilati tramite una socket TCP appositamente aperta.
 
 Successivamente, è stato possibile inoltrare aggiornamenti al microcontrollore tramite il seguente comando disponibile nel framework offerto da **PlatformIO**:
 
@@ -244,7 +264,7 @@ Nel caso in cui la connessione alla rete WiFi selezionata vada a buon fine, il m
 
 ### Comunicazione con il Broker MQTT
 
-La gestione della connessione e dell'invio di messaggi al Broker MQTT è stata, invece, affidata alla liberia **PubSubClient**. Ad intervalli specificati dalla macro `MQTT_PUBLISH_INTERVAL_MS`, un'eventuale rilevazione valida viene inviata al Broker sull'apposito topic di aggiornamento dello stato di qualità dell'aria. Nel caso di assenza di connettività al Broker, invece, il sistema tenta regolarmente una riconnessione finchè questa non risulta avvenuta. 
+La gestione della connessione e dell'invio di messaggi al Broker MQTT è stata, invece, affidata alla liberia **PubSubClient**. Ad intervalli specificati dalla macro `MQTT_PUBLISH_INTERVAL_MS`, un'eventuale rilevazione valida viene inviata al Broker sull'apposito topic di aggiornamento dello stato di qualità dell'aria. Nel caso di assenza di connettività, invece, il sistema tenta regolarmente una riconnessione finchè questa non risulta avvenuta. 
 
 Due ulteriori messaggi vengono, infine, comunicati al broker al momento della connessione:
 
@@ -262,8 +282,6 @@ Sulla base dell'identificatore univoco di ogni sensore, i topic coinvolti risult
 1. `airquality/[sensorID]/status` (Nuova rilevazione dal sensore identificato da`[sensorID]`)
 
 Il codice sorgente del firmware implementato risulta accessibile all'interno del progetto PlatformIO contenuto all'interno della directory `firmware`.
-
-\newpage
 
 # Definizione del Broker MQTT
 
@@ -325,8 +343,6 @@ exec "$@"
 
 Una volta eseguito, il servizio risulterà accessibile alla porta 1883 del container.
 
-
-\newpage
 
 # Ricezione dei dati
 
@@ -420,18 +436,18 @@ Tali parametri vengono codificati dalle seguenti variabili d'ambiente:
 
 \newpage
 
-# Definizione del database per lo storage dei dati
+# Definizione di un database per lo storage dei dati
 
 ## Scelta del DBMS
 
-Al fine di permettere il salvataggio e la successiva fruizione dei dati raccolti da VINDRIKTNING è stata impiegata una base di dati organizzata come servizio indipendente e anch'esso containerizzato. In particolare, è stato scelto l'impiego del DBMS **InfluxDB** sulla base delle seguenti necessità:
+Al fine di permettere il salvataggio e la successiva fruizione dei dati, è stata impiegata una base di dati organizzata come servizio indipendente, anch'esso containerizzato. In particolare, è stata scelta l'adozione del DBMS **InfluxDB** sulla base della risposta alle seguenti necessità:
 
 - Organizzazione dei dati orientata ai **timestamp** 
-- Definizione di una **retention policy** al fine di permettere l'eliminazione dei dati al di fuori del periodo di interesse. 
+- Definizione di una **retention policy** al fine di permettere l'eliminazione dei dati al di fuori del periodo di interesse 
 
 ## Containerizzazione 
 
-Al fine di rendere accessibile il servizio tramite un container Docker, è stato descritto il seguente Dockerfile (che prevede solamente l'inclusione di un opportuno script di inzializzazione all'interno dell'immagine originale).
+La containerizzazione del servizio ha richiesto la sola definizione del seguente Dockerfile che, nello specifico, prevede l'inclusione di un opportuno script di inzializzazione all'interno dell'immagine **InfluxDB** originale al fine di inizializzare il database utilizzato e la retention policy.
 
 |
 |
@@ -447,8 +463,8 @@ ADD ./influxdb/createdb.iql /docker-entrypoint-initdb.d/
 In particolare, lo script `createdb.iql` (il cui contenuto è di seguito riportato) prevede la definizione di:
 
 - Un database denominato `airquality` con retention-policy pari a 7 giorni
-- Definizione di un utente con permessi di scrittura e lettura sulla base di dati 
-- Definizione di un utente con permessi di sola lettura sulla base di dati 
+- Un utente con permessi di scrittura e lettura sulla base di dati 
+- Un utente con permessi di sola lettura sulla base di dati 
 
 |
 |

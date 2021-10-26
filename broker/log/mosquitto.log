@@ -3866,3 +3866,8 @@
 1635203373: Saving in-memory database to /mosquitto/data/mosquitto.db.
 1635205172: Saving in-memory database to /mosquitto/data/mosquitto.db.
 1635206971: Saving in-memory database to /mosquitto/data/mosquitto.db.
+1635208041: Client VINDRIKTNING-54F9AE has exceeded timeout, disconnecting.
+1635208087: New connection from 192.168.32.1:57792 on port 1883.
+1635208087: New client connected from 192.168.32.1:57792 as VINDRIKTNING-54F9AE (p2, c1, k10, u'mosquitto').
+1635208770: Saving in-memory database to /mosquitto/data/mosquitto.db.
+1635210569: Saving in-memory database to /mosquitto/data/mosquitto.db.
