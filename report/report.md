@@ -85,7 +85,7 @@ Al fine di poter attuare gli obiettivi preposti, sono stati delineati i principa
 - Un servizio per la **ricezione centralizzata dei dati**
 - Un **database** adibito allo storage e all'interrogazione dei dati raccolti
 - Un applicativo rivolto alla **fruizione** dei dati raccolti e alla **configurazione** del sistema
-- Un servizio per **notificare uno o più utenti** in caso di cambiamenti notevoli. 
+- Un servizio per la **notifica di uno o più utenti** in caso di cambiamenti notevoli. 
 
 Al fine di favorire in partenza lo sviluppo **indipendente** di ognuno dei servizi sopracitati, è stata addottata una strategia implementativa basata sull'organizzazione e la coordinazione di molteplici container. Tramite quest'ultimi, infatti, le risorse possono essere isolate e i processi avviati e gestiti separatamente. Personalizzazioni e modifiche possono, inoltre, essere apportate senza compromettere il funzionamento complessivo del sistema.
 
@@ -261,6 +261,8 @@ Sulla base dell'identificatore univoco di ogni sensore, i topic coinvolti risult
 2. `airquality/[sensorID]/offline` (Disconnessione del sensore identificato da `[sensorID]`)
 1. `airquality/[sensorID]/status` (Nuova rilevazione dal sensore identificato da`[sensorID]`)
 
+Il codice sorgente del firmware implementato risulta accessibile all'interno del progetto PlatformIO contenuto all'interno della directory `firmware`.
+
 \newpage
 
 # Definizione del Broker MQTT
@@ -337,12 +339,11 @@ La ricezione dei dati trasmessi dalle unità VINDRIKTNING è stata affidata ad u
 
 ## Containerizzazione 
 
-Il servizio è stato implementato in **Python** sfruttando le librerie **Requests** e **Paho MQTT Python Client** ed è stato, successivamente, containerizzato a partire dall'immagine **alpine** tramite il Dockerfile di seguito riportato. Quest'ultimo prevede:
+Il servizio è stato implementato in **Python** sfruttando le librerie **Requests** e **Paho MQTT Python Client** ed è stato, successivamente, containerizzato a partire dall'immagine **Alpine** tramite il Dockerfile di seguito riportato. Quest'ultimo prevede:
 
 - L'installazione delle librerie necessarie
 - La creazione di una cartella che andrà a contenere il file di log prodotto dal programma nel corso della sua esecuzione
-- L'aggiunta del programma `engine.py` e dello script `run.sh` per la sua esecuzione all'interno del container
-- L'esecuzione del programma all'avvio del container
+- L'aggiunta del programma `engine.py` e dello script `entrypoint.sh` per l'inizializzazione del container
 
 |
 |
@@ -371,7 +372,7 @@ CMD ["python3", "/engine.py"]
 |
 |
 
-Lo script `run.sh` esegue le seguenti istruzioni al fine di mantenere disponibile il logfile **antecedente** all'ultimo riavvio del sistema nel caso in cui questo sia disponibile a seguito dell'impiego di un volume persistente. In questo modo è possibile, a seguito di un riavvio improvviso, determinarne le cause consultando il file di log riportante le informazioni di interesse.
+Lo script `entrypoint.sh` esegue le seguenti istruzioni al fine di mantenere disponibile il logfile **antecedente** all'ultimo riavvio del sistema nel caso in cui questo sia disponibile grazie all'impiego di un volume persistente. Questo permette all'utilizzatore di individuare le motivazioni che hanno provocato la più recente interruzione del programma.
 
 |
 |
@@ -385,18 +386,50 @@ python3 /engine.py
 |
 |
 
-Il codice sorgente dell'applicativo è consultabile al path `engine/engine.py`.
+Il codice sorgente dell'applicativo è consultabile al path `engine/engine.py` della repository.
+
+
+## Ricezione dei dati 
+
+La ricezione dei dati tramessi dalle unità VINDRIKTNING al Broker MQTT sui topic d'interesse richiede l'autenticazione di Engine. A tal fine, il container prevede la definizione delle variabili d'ambiente `MOSQUITTO_USERNAME` e `MOSQUITTO_PASSWORD` in riferimento, rispettivamente, al nome utente e alla password previsti da Eclipse Mosquitto a seguito della configurazione sopradescritta.
+
+## Trasmissione dei dati ricevuti
+
+Ad ogni nuovo messaggio ricevuto, Engine comunica la nuova osservazione o l'eventuale aggiornamento di stato di un sensore ad un servizio denominato **AirPI** (descritto nel dettaglio nel corso dei capitoli successivi). La completa comunicazione fra Engine ed AirPI richiede la presenza di: 
+
+- Un endpoint per la comunicazione di **aggiornamenti di stato** di un'unità VINDRIKTNING
+- Un endpoint per la comunicazione di **nuove rilevazioni** da parte di un sensore
+- Un endpoint per l'innesco di un **evento di notifica** all'atto del superamento di specifici threshold
+
+Questi ultimi vengono rispettivamente codificati, all'interno del programma, dalle seguenti variabili d'ambiente:
+
+- `SENSOR_STATUS_ENDPOINT`
+- `DATA_ENDPOINT`
+- `NOTIFICATION_ENDPOINT`
+
+La comunicazione prevede, infine, un'autenticazione di Engine presso AirAPI basata su Json Web Tokens. A tal fine, l'applicativo necessita della presenza di:
+
+- Un endpoint per l'**autenticazione** del servizio
+- Un **identificativo** e un **secret** al fine di poter richiedere un token di autenticazione 
+
+Tali parametri vengono codificati dalle seguenti variabili d'ambiente:
+
+- `AUTH_ENDPOINT`
+- `AUTH_APPNAME`
+- `AUTH_APPPASS`
 
 \newpage
 
 # Definizione del database per lo storage dei dati
+
+## Scelta del DBMS
 
 Al fine di permettere il salvataggio e la successiva fruizione dei dati raccolti da VINDRIKTNING è stata impiegata una base di dati organizzata come servizio indipendente e anch'esso containerizzato. In particolare, è stato scelto l'impiego del DBMS **InfluxDB** sulla base delle seguenti necessità:
 
 - Organizzazione dei dati orientata ai **timestamp** 
 - Definizione di una **retention policy** al fine di permettere l'eliminazione dei dati al di fuori del periodo di interesse. 
 
-## Containerizzazione di InfluxDB 
+## Containerizzazione 
 
 Al fine di rendere accessibile il servizio tramite un container Docker, è stato descritto il seguente Dockerfile (che prevede solamente l'inclusione di un opportuno script di inzializzazione all'interno dell'immagine originale).
 
@@ -422,24 +455,21 @@ In particolare, lo script `createdb.iql` (il cui contenuto è di seguito riporta
 
 ```sql
 CREATE DATABASE airquality WITH DURATION 7d
-
 CREATE USER api WITH PASSWORD 'apisecret'
-
 CREATE USER reader WITH PASSWORD 'read'
-
 GRANT READ ON airquality to api 
-
 GRANT READ ON airquality to reader 
-
 GRANT WRITE ON airquality to api 
 ```
 
 |
 |
 
-Una volta avviato il servizio risulterà, quindi, disponibile all'uso e accessibile alla porta **8086** del container.
+Una volta avviato, il servizio risulterà disponibile all'uso e accessibile tramite la porta **8086** del container.
 
 \newpage
+
+
 
 
 

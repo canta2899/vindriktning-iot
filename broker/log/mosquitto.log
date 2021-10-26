@@ -3864,3 +3864,5 @@
 1635201578: New connection from 192.168.32.1:61456 on port 1883.
 1635201578: New client connected from 192.168.32.1:61456 as VINDRIKTNING-54F9AE (p2, c1, k10, u'mosquitto').
 1635203373: Saving in-memory database to /mosquitto/data/mosquitto.db.
+1635205172: Saving in-memory database to /mosquitto/data/mosquitto.db.
+1635206971: Saving in-memory database to /mosquitto/data/mosquitto.db.
