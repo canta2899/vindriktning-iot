@@ -34,7 +34,7 @@ header-includes:
 % logapp
 % influxdb
 % mqtt app
-% funzionamento del bot telegrama
+% funzionamento del bot telegram
 % dashboard e grafici con grafana
 % Deployment su raspberry pi (nota su costo raspberry pi)
 % Conclusioni e followups (app al posto del bot telegram, possibilità di integrazione con altri sistemi ikea fra cui ad esempio il purificatore)
@@ -486,11 +486,39 @@ Una volta avviato, il servizio risulterà disponibile all'uso e accessibile tram
 \newpage
 
 
+# AirPI
+
+## Monitoring Tool
+
+Come evidenziato nei capitoli precedenti, il sensore, oltre ad acquisire il valore di qualità dell’aria circostante, è in grado di memorizzare le misurazioni popolando un database, il quale conterrà le informazioni raccolte negli ultimi 7 giorni per poi eliminarle gradualmente.
+Al fine di rendere visibili all'utente questi dati è stato realizzato un **monitoring tool** disponibile sulla porta 8000 del localhost. La visualizzazione si suddivide in due parti:
+- un grafico riportante l'andamento dei rilevamenti effettuati dalla stazione nelle ultime 24 ore
+- un barplot riportante la mediana, relativa a ciascun sensore, raffigurante i valori raccolti nello stesso intervallo di tempo
+
+Il monitoring tool offre al cliente anche altre funzionalità elencate nella navigation bar come la possibilità di eseguire queries specifiche oppure quella di interagire col bot Telegram.
+
+La prima...
+
+La seconda invece serve nella gestione dei token, e dei relativi account ad essi collegati, in modo tale che il proprietario possa autorizzare utenti diversi nella fase d’interazione col bot mediante il loro nome utente. Questa funzionalità rimane aperta anche alla revoca di questa autorizzazione nel caso in cui non sia più necessario alcun tipo di interazione.
 
 
 
+## Bot Telegram
 
+Come detto in precedenza l’utente ha la possibilità di controllare da remoto la qualità dell’aria della stanza in cui si trova il sensore. Per sfruttare questa funzionalità l’utente, o chi è stato autorizzato da questo mediante user name, deve interagire con un bot Telegram ed in seguito inserire il token corretto richiesto dal programma come livello di autenticazione.
+Il bot reagisce ad alcuni messaggi inviati dall’utente con le seguenti modalità:
+-	/token il bot comunica che ha creato un token specifico per l’utente, se questo comando viene inviato nuovamente allora provvederà a crearne uno nuovamente
+-	/token tokenSbagliato il bot risponde avvisando il cliente che ‘non esiste un sensore con quel nome’ 
+-	/token tokenCorretto il bot registra l’utente ed acconsente all’inizio della conversazione
+- /bind ...
+-	/status il bot restituisce lo status corrente dei sensori associati i quali possono essere online oppure offline
+-	/info nomeSensore il bot restituisce le informazioni relative al sensore in questione riportando alcuni dati quali:
+-	Sensor Name: nome del sensore in questione
+-	Quality: qualità dell’aria rilevata dal sensore rappresentata da un colore
+-	Value: valore effettivo rilevato in interi secoindo la misurazione PM2.5
+In aggiunta a questo messaggio l’utente riceverà anche una legenda per interpretare la qualità notificata, lo stesso presente sul sensore fisico in quel momento. Nel caso in cui all’utente non sia associato alcun sensore oppure il nome riportato da questo non sia corretto, il bot provvederà a inviare un messaggio d’errore nel quale viene specificata la ragione.
 
+Le comunicazioni del sistema tuttavia non si limitano alla necessità d’intervento da parte dell’utente. Infatti, una volta avviato il bot nella maniera sopra indicata, l’utente riceverà delle notifiche nel caso in cui la qualità dell’aria all’interno della stanza dovesse cambiare. Ciò avviene quando il valore misurato dal sensore supera una certa soglia per la quale ne consegue il cambiamento del colore identificativo della qualità rilevata. L’utente e chiunque sia collegato al sensore, riceverà quindi una notifica nella quale lo si avvisa della variazione suggerendo, in caso di necessità, delle azioni da eseguire per migliorare la situazione.
 
 
 
