@@ -491,16 +491,17 @@ Una volta avviato, il servizio risulterà disponibile all'uso ed accessibile tra
 ## Monitoring Tool
 
 Come evidenziato nei capitoli precedenti, il sensore, oltre ad acquisire il valore di qualità dell’aria circostante, è in grado di memorizzare le misurazioni popolando un database, il quale conterrà le informazioni raccolte negli ultimi 7 giorni per poi eliminarle gradualmente.
-Al fine di rendere visibili all'utente questi dati è stato realizzato un **monitoring tool** disponibile sulla porta 8000 del localhost. La visualizzazione si suddivide in due parti:
+Al fine di rendere visibili all'utente questi dati è stato realizzato un **monitoring tool** disponibile sulla porta 8000 del localhost. La visualizzazione della home page si suddivide in due parti:
 - un grafico riportante l'andamento dei rilevamenti effettuati dalla stazione nelle ultime 24 ore
 - un barplot riportante la mediana, relativa a ciascun sensore, raffigurante i valori raccolti nello stesso intervallo di tempo
 
-Il monitoring tool offre al cliente anche altre funzionalità elencate nella navigation bar come la possibilità di eseguire queries specifiche oppure quella di interagire col bot Telegram.
+Il monitoring tool tuttavia, offre al cliente anche altre funzionalità elencate nella navigation bar come la possibilità di eseguire queries specifiche oppure quella di gestione degli utenti Telegram.
 
 La prima...
 
-La seconda invece serve nella gestione dei token, e dei relativi account ad essi collegati, in modo tale che il proprietario possa autorizzare utenti diversi nella fase d’interazione col bot mediante il loro nome utente. Questa funzionalità rimane aperta anche alla revoca di questa autorizzazione nel caso in cui non sia più necessario alcun tipo di interazione.
-
+La seconda invece, come anticipato, serve alla gestione degli utenti, e dei relativi account Telegram ad essi collegati. 
+Nel momento in cui viene istanziato il container, sulla base delle variabili ambientali definite, si crea il primo utente con privilegi da amministratore. Questo infatti ha la possibilità di aggiungere alla lista, o rimuovere in caso di necessità, alcuni utenti Telegram che potranno consultare la schermata home del monitoring tool, descritta in precedenza. L'amministratore, cliccando sull'apposito pulsante, potrà inserirne lo user name ma solo una volta che l'utente aggiunto entrerà in contatto col bot potrà inviare un messaggio '/bind' per completare l'associazione facendo comparire accanto al nome anche il 'chat id'. In questo modo potrà ricevere le notifiche relative alle misurazioni in tempo reale, incluse quelle di cambiamento di livello qualitativo dell'aria.
+Così facendo si garantisce un livello di sicurezza da ambo i lati evitando in modo tale sia che utenti estranei possano comunicare con il bot, che quest'ultimo possa inviare messaggi ad utenti che non desiderano riceverli.
 
 
 ## Bot Telegram
