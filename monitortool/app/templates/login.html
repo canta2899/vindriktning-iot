@@ -2,8 +2,8 @@
 
 {% block content %}
 
-<section class="vh-100" style="padding: 50px;">
-  <div class="container py-5 h-100">
+<section style="padding: 50px;">
+  <div class="container py-5">
     <div class="row d-flex justify-content-center align-items-center h-100">
       <div class="col col-xl-10">
         <div class="card" style="border-radius: 1rem;">
@@ -58,7 +58,7 @@
             password: password
         };
 
-        let response = await fetch('/auth', {
+        let response = await fetch('/api/auth', {
             method: 'POST', 
             headers: {
                 'Content-Type': 'application/json',

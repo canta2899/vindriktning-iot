@@ -2,8 +2,7 @@ version: "3"
 services:
   engine:
     build:
-      context: .
-      dockerfile: Dockerfile_engine
+      context: ./engine
     container_name: engine 
     environment:
       - MOSQUITTO_USERNAME=${MOSQUITTO_USERNAME}
@@ -21,8 +20,7 @@ services:
 
   monitortool:
     build:
-      context: .
-      dockerfile: Dockerfile_monitortool
+      context: ./monitortool
     container_name: monitortool
     environment:
       - INFLUXDB_API_USER=${INFLUXDB_API_USER}
@@ -40,8 +38,7 @@ services:
 
   broker:
     build:
-      context: .
-      dockerfile: Dockerfile_broker 
+      context: ./broker
     environment:
       - MOSQUITTO_USERNAME=${MOSQUITTO_USERNAME}
       - MOSQUITTO_PASSWORD=${MOSQUITTO_PASSWORD}
@@ -49,14 +46,13 @@ services:
     ports:
       - "1883:1883"
     volumes:
-      - ./broker/config:/mosquitto/config
+      # - ./broker/config:/mosquitto/config
       - ./broker/log:/mosquitto/log
     restart: always
 
   database:
     build:
-      context: .
-      dockerfile: Dockerfile_influxdb
+      context: ./influxdb
     container_name: database
     environment:  
       - INFLUXDB_ADMIN_USER=${INFLUXDB_ADMIN_USER}

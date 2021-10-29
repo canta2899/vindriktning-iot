@@ -1,0 +1,15 @@
+FROM alpine
+
+RUN apk add --update --no-cache python3
+RUN python3 -m ensurepip
+RUN pip3 install --no-cache --upgrade pip setuptools
+RUN pip3 install --no-cache --upgrade paho-mqtt
+RUN pip3 install --no-cache --upgrade requests
+RUN mkdir /log
+
+ADD ./engine.py /
+ADD ./entrypoint.sh /
+
+ENTRYPOINT ["sh", "/entrypoint.sh"]
+
+CMD ["python3", "/engine.py"]

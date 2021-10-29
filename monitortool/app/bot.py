@@ -233,9 +233,6 @@ class Bot:
                 timeout=20
             ).json()
 
-            
-            print(f"Receiving {up}")
-
         except ValueError as e:
             return
 

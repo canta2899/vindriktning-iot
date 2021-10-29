@@ -1,3 +1,4 @@
+from re import I
 from flask import (
     Flask,
     render_template,
@@ -27,37 +28,41 @@ from secrets import token_urlsafe
 from datetime import datetime, timedelta
 from influxdb import InfluxDBClient
 from flask_sqlalchemy import SQLAlchemy
+from passlib.hash import pbkdf2_sha256
 import json
+import sys
+import signal
+import time
 import os
 
 from bot import Bot
 
-APP_NAME = os.environ['AUTH_APPNAME']
-APP_SECRET = os.environ['AUTH_APPPASS']
+# APP_NAME = os.environ['AUTH_APPNAME']
+# APP_SECRET = os.environ['AUTH_APPPASS']
 APP_ID = "engineapp"
 
-# APP_NAME = 'prova'
-# APP_SECRET = 'test'
+APP_NAME = 'prova'
+APP_SECRET = 'test'
 
 TOKENS_FILE = '/tokens/tokens.json'
 INFLUX_DB_DATABASE = 'airquality'
 
-INFLUX_DB_USER = os.environ['INFLUXDB_API_USER'] 
-INFLUX_DB_PASSWORD = os.environ['INFLUXDB_API_PASSWORD']
-INFLUX_DB_HOST = 'database'         
-INFLUX_DB_PORT = 8086
-TELEGRAM_BOT_TOKEN = os.environ['TELEGRAM_BOT_TOKEN'] 
-
-# INFLUX_DB_USER = 'bridge' 
-# INFLUX_DB_PASSWORD = 'bridge'
-# INFLUX_DB_HOST = 'localhost'         
+# INFLUX_DB_USER = os.environ['INFLUXDB_API_USER'] 
+# INFLUX_DB_PASSWORD = os.environ['INFLUXDB_API_PASSWORD']
+# INFLUX_DB_HOST = 'database'         
 # INFLUX_DB_PORT = 8086
-# TELEGRAM_BOT_TOKEN = '2097018200:AAHoG4d1yd530euFuCFBRS6AEQ-HeGwzgkY'
+# TELEGRAM_BOT_TOKEN = os.environ['TELEGRAM_BOT_TOKEN'] 
+
+INFLUX_DB_USER = 'bridge' 
+INFLUX_DB_PASSWORD = 'bridge'
+INFLUX_DB_HOST = 'localhost'         
+INFLUX_DB_PORT = 8086
+TELEGRAM_BOT_TOKEN = '2097018200:AAHoG4d1yd530euFuCFBRS6AEQ-HeGwzgkY'
 
 
 
-LINE = 'select mean("pm25") from "airquality" where time > now() - 24h group by time(2m) fill(none)'
-BAR = 'select mean("pm25") from "airquality" where time > now() - 24h group by "name"'
+LINE = 'select mean("pm25") from "airquality" where time > now() - 10d group by time(2m) fill(none)'
+BAR = 'select mean("pm25") from "airquality" where time > now() - 10d group by "name"'
 
 app = Flask(__name__)
 jwt = JWTManager(app)
@@ -81,8 +86,9 @@ db = SQLAlchemy(app)
 
 class User(db.Model):
     id = db.Column(db.Integer, db.Sequence('user_id_seq'), primary_key=True)
-    name = db.Column(db.String(50), unique=True)
-    password = db.Column(db.String(80))
+    name = db.Column(db.Text, unique=True)
+    password = db.Column(db.Text)
+    is_admin = db.Column(db.Boolean, default=False)
 
 class TelegramUser(db.Model):
     username = db.Column(db.String(50), primary_key=True)
@@ -317,14 +323,18 @@ def is_from_browser(user_agent):
         "webkit",
     ] 
  
+@app.errorhandler(403)
+def forbidden(e):
+    return render_template('403.html'), 403
+ 
 @app.errorhandler(404)
 def page_not_found(e):
     return render_template('404.html'), 404
 
 @jwt.expired_token_loader
-def my_expired_token_callback(jwt_header, jwt_payload):
+def expired_token(jwt_header, jwt_payload):
     if is_from_browser(request.user_agent):
-        return render_template('login.html', logged=False)
+        return render_template('login.html', logged=False, params={'admin': False})
     return jsonify({'msg': 'Token has expired'}), 401
 
 @app.route('/')
@@ -337,10 +347,21 @@ def entry_point():
     """
 
     current_identity = get_jwt_identity()
+    
+    params = {
+        'admin': False
+    }
+    
     if current_identity:
-        return render_template('charts.html', logged=True)
+        user = User.query.filter_by(id=current_identity).first()
+        if not user:
+            return redirect('/logout')
+        if user.is_admin:
+            print("User is admin")
+            params['admin'] = True
+        return render_template('charts.html', logged=True, params=params)
     else:
-        return render_template('login.html', logged=False)
+        return render_template('login.html', logged=False, params=params)
 
 
 @app.route('/api/data/line')
@@ -353,9 +374,11 @@ def data():
     """
 
     res = get_influx().query(LINE)
+
     if not res:
         return {'status': 'data_unreachable'}, 500
     queried_data = list(res.get_points(measurement='airquality'))
+    # get_ts = lambda x: datetime.strptime(x, '%Y-%m-%dT%H:%M:%S%z').timestamp()
     chart_data = [{'x': q['time'], 'y': q['mean']} for q in queried_data]
     return Response(
         json.dumps(chart_data),
@@ -395,6 +418,9 @@ def airquality():
 
     current_identity = get_jwt_identity()
 
+    if is_from_browser(request.user_agent):
+        return jsonify({'msg': 'Forbidden'}), 403
+
     try:
         new_status = request.get_json()
         new_status['time'] = datetime.now()
@@ -405,74 +431,169 @@ def airquality():
     return jsonify({'msg': 'ok'}), 200
 
 
-@app.route("/api/addTgUser", methods=['POST'])
+@app.route("/api/telegram", methods=['GET', 'POST', 'DELETE'])
 @jwt_required()
-def newtoken():
-
-    """
-        Adds a new telegram user to the database
-    """
+def telegram_users_api():
 
     current_identity = get_jwt_identity()
 
-    try:
-        jreq = request.get_json()
-        username = jreq['username']
-    except Exception as e:
-        return jsonify({'msg': 'Bad request'}), 400
+    if request.method == 'POST':
 
-    previous = TelegramUser.query.filter_by(username=username).all()
+        """
+            Adds a new telegram user to the database
+        """
+
+        try:
+            jreq = request.get_json()
+            username = jreq['username']
+        except Exception as e:
+            return jsonify({'msg': 'Bad request'}), 400
+
+        previous = TelegramUser.query.filter_by(username=username).all()
+        
+        for user in previous:
+            db.session.delete(user)
+
+        new_user = TelegramUser(username=username)
+        db.session.add(new_user)
+
+        db.session.commit()
+
+        return jsonify({'msg': 'User added'}), 200
     
-    for user in previous:
-        db.session.delete(user)
+    if request.method == 'DELETE':
 
-    new_user = TelegramUser(username=username)
-    db.session.add(new_user)
+        """
+            Removes a telegram user from the database
+        """ 
 
-    db.session.commit()
+        try:
+            jreq = request.get_json()
+            username = jreq['username']
+        except Exception as e:
+            return jsonify({'msg': 'Bad request'}), 400
 
-    return jsonify({'msg': 'User added'}), 200
+        user = TelegramUser.query.filter_by(username=username).all()
+
+        if len(user) == 0:
+            return jsonify({'msg': 'Unknown user'}), 409 
+
+        for usr in user:
+            db.session.delete(usr)
+        db.session.commit()
+
+        return jsonify({'msg': 'Deleted user'}), 200
+    
+    if request.method == 'GET':
+
+        """
+            Retrieves all telegram users in the database    
+        """
+        
+        all_users = TelegramUser.query.all()
+        response = [{'username': user.username, 'chat_id': user.chat_id} for user in all_users]
+        return jsonify({'users': response}), 200
 
 
-@app.route("/api/delTgUser", methods=['POST'])
+@app.route("/api/users", methods=['GET', 'POST', 'DELETE', 'PUT'])
 @jwt_required()
-def deltoken():
-
-    """
-        Removes a telegram user from the database
-    """ 
+def users_api():
 
     current_identity = get_jwt_identity()
+    if not current_identity:
+        return redirect('/login', logged=False, admin=False)
 
-    try:
-        jreq = request.get_json()
-        username = jreq['username']
-    except Exception as e:
-        return jsonify({'msg': 'Bad request'}), 400
+    requestor = User.query.filter_by(id=current_identity).first()
 
-    user = TelegramUser.query.filter_by(username=username).all()
+    if not requestor:
+        return redirect('/'),
 
-    if len(user) == 0:
-        return jsonify({'msg': 'Unknown user'}), 409 
+    if not requestor.is_admin:
+        return redirect('/'),
+        
+    if request.method == 'GET':
+        users = User.query.all()
+        response = [{'username': user.name, 'is_admin': user.is_admin} for user in users if user.name != requestor.name]
+        return jsonify(response), 200 
 
-    for usr in user:
-        db.session.delete(usr)
-    db.session.commit()
+    if request.method == 'POST':
+        try:
+            jreq = request.get_json()
+            username = jreq['username']
+            new_password = jreq['newPassword']
+            password = jreq['reqPassword']
+            is_admin = jreq['newAdmin']
+        except Exception as e:
+            return jsonify({'msg': 'Bad request'}), 400
+        
+        if not pbkdf2_sha256.verify(password, requestor.password):
+            return jsonify({'msg': 'WrVong password'}), 401
+        
+        match = User.query.filter_by(name=username).first()
+        
+        if not match:
+            new_user = User(name=username, password=pbkdf2_sha256.hash(password), is_admin=is_admin)
+            db.session.add(new_user)
+            db.session.commit()
+            return jsonify({'msg': 'Added user'}), 200
+            
+        return jsonify({'msg': 'User already exists'}), 409
 
-    return jsonify({'msg': 'Deleted user'}), 200
+    if request.method == 'PUT':
+        try:
+            jreq = request.get_json()
+            username = jreq['username']
+            password = jreq['reqPassword']
+            new_password = jreq['newPassword']
+            new_is_admin = jreq['newAdmin']
+        except Exception as e:
+            return jsonify({'msg': 'Bad request'}), 400
+            
+        # TODO check requestor password
+
+        if not pbkdf2_sha256.verify(password, requestor.password):
+            return jsonify({'msg': 'Wrong password'}), 401
+
+        match = User.query.filter_by(name=username).first()
+        
+        if not match:
+            return jsonify({'msg': 'User not exists'}), 409
+        
+        if new_password is not None:
+            match.password = pbkdf2_sha256.hash(new_password)
+        
+        match.is_admin = new_is_admin
+
+        db.session.commit() 
+
+        return jsonify({'msg': 'User updated'}), 200
+    
+    if request.method == 'DELETE':
+        try:
+            jreq = request.get_json()
+            username = jreq['username']
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return jsonify({'msg': 'Bad request'}), 400
+        
+        if username == requestor.name:
+            return jsonify({'msg': 'Trying to delete current user'}), 409
+        
+        match = User.query.filter_by(name=username).first()
+
+        if not match:
+            return jsonify({'msg': 'User not found'}), 409
 
 
-@app.route("/api/allTgUsers", methods=['GET'])
-@jwt_required()
-def alltoken():
-
-    """
-        Shows all telegram users in the database    
-    """
-
-    all_users = TelegramUser.query.all()
-    response = [{'username': user.username, 'chat_id': user.chat_id} for user in all_users]
-    return jsonify(response), 200
+        if match.id == current_identity:
+            unset_jwt_cookies()
+            return jsonify({'msg': 'Cannot delete current user'}), 100
+        
+        
+        db.session.delete(match)
+        db.session.commit()
+        return jsonify({'msg': 'Deleted user'}), 200
 
 
 @app.route("/telegram", methods=['GET'])
@@ -485,58 +606,139 @@ def telegram():
     """
 
     current_identity = get_jwt_identity()
-
+    params = {
+            'admin': False
+    }
     if current_identity:
-        return render_template('telegram.html', logged=True)
-    return render_template('login.html', logged=False)
+        user = User.query.filter_by(id=current_identity).first()
+        params['admin'] = user.is_admin
+        return render_template('telegram.html', logged=True, params=params)
+    return render_template('login.html', logged=False, params=params)
 
+
+@app.route("/users", methods=['GET'])
+@jwt_required(optional=True)
+def users():
+
+    """
+        Renders telegram user page table if authenticated.
+        Otherwise redirects to the login page
+    """
+
+    current_identity = get_jwt_identity()
+    params = {
+        'admin': False
+    }
+    if current_identity:
+        user = User.query.filter_by(id=current_identity).first()
+        if user.is_admin:
+            params['admin'] = True
+            return render_template('users.html', logged=True, params=params)
+    return redirect('/')
+
+@app.route("/me", methods=['GET'])
+@jwt_required()
+def me():
+    
+    """
+        Renders user's profile page
+    """
+    
+    current_identity = get_jwt_identity()
+
+    params = {
+        'admin': False
+    }
+    
+    if current_identity:
+        me = User.query.filter_by(id=current_identity).first()
+        params['username'] = me.name
+        params['admin'] = me.is_admin
+        return render_template('profile.html', logged=True, params=params)
+    
+    return render_template('login.html', logged=False, params=params)
+
+
+@app.route("/api/me", methods=['PUT'])
+@jwt_required()
+def api_me():
+    
+    """
+        Updates user's informations
+    """
+    
+    current_identity = get_jwt_identity()
+    
+    if not current_identity:
+        return jsonify({'msg': 'Not authorized'}), 403
+    
+    user = User.query.filter_by(id=current_identity).first()
+    
+    if not user:
+        return jsonify({'msg': 'User not found'}), 404
+
+    try:
+        jreq = request.get_json()
+        username = jreq['username']
+        req_password = jreq['reqPassword']
+        new_password = jreq['newPassword']
+    except Exception as e:
+        return jsonify({'msg': 'Bad request'}), 400
+    
+    if pbkdf2_sha256.verify(req_password, user.password):
+        if new_password != "" and new_password != None:
+            user.password = pbkdf2_sha256.hash(new_password)
+        
+        if username != "" and username != None and username != user.name:
+            user.name = username
+        
+        db.session.commit()
+        return jsonify({'msg': 'Updated'}), 200
+
+    return jsonify({'msg': 'Wrong password'}), 400
 
 @app.route("/api/auth", methods=['POST'])
 def auth_api():
 
     """
-        APPS AUTHORIZATION ENDPOINT
+        AUTHORIZATION ENDPOINT
     """
 
-    # Gets name and secret from header
-    try:
-        appname = request.headers.get('appName')
-        secret = request.headers.get('secret')
-    except Exception as e:
-        return jsonify({'msg': 'Bad request'}), 400
+    if is_from_browser(request.user_agent):
+        try:
+            jreq = request.get_json()
+            username = jreq['username']
+            password = jreq['password']
+        except Exception as e:
+            return jsonify({'msg': 'Bad request'}), 400        
+        
+        # TODO check if user is valid and produce access token
+        user = User.query.filter_by(name=username).first()
 
-    if appname == APP_NAME and secret == APP_SECRET:
-        access_token = create_access_token(identity=APP_ID)
-        return jsonify({'access_token': access_token}), 200
-    
-    return jsonify({'msg': 'Not Authorized'}), 401
+        if not user:
+            return jsonify({'msg': 'Unknown user'}), 401
+        
+        if not pbkdf2_sha256.verify(password, user.password):
+            return jsonify({'msg': 'Wrong password'}), 401
+        
+        response = jsonify({"msg": "login successful"})
+        access_token = create_access_token(identity=user.id)
+        set_access_cookies(response, access_token)
+        return response
+    else:
+        # Gets name and secret from header
+        try:
+            appname = request.headers.get('appName')
+            secret = request.headers.get('secret')
+        except Exception as e:
+            return jsonify({'msg': 'Bad request'}), 400
 
+        if appname == APP_NAME and secret == APP_SECRET:
+            access_token = create_access_token(identity=APP_ID)
+            return jsonify({'access_token': access_token}), 200
+        
+        return jsonify({'msg': 'Not Authorized'}), 401
 
-@app.route("/auth", methods=['POST'])
-def auth():
-
-    """
-        Authenticates the user with given credentials. Returns
-        token if valid.
-    """
-
-    try:
-        jreq = request.get_json()
-        username = jreq['username']
-        password = jreq['password']
-    except Exception as e:
-        return jsonify({'msg': 'Bad request'}), 400        
-    
-    # TODO check if user is valid and produce access token
-    user = User.query.filter_by(name=username, password=password).first()
-
-    if not user:
-        return jsonify({'message': 'Unknown user'}), 401
-    
-    response = jsonify({"msg": "login successful"})
-    access_token = create_access_token(identity=user.id)
-    set_access_cookies(response, access_token)
-    return response
 
 @app.route("/login", methods=['GET'])
 def login():
@@ -544,13 +746,10 @@ def login():
     """
         Renders login page template
     """
+
     current_identity = get_jwt_identity()
-    if current_identity[0] != 'u':
-        return jsonify({'msg': 'Unathorized endpoint'}), 401
-    
     # useridentity = User.query.filter_by(username=current_identity[2:]).first()
-    
-    return render_template('login.html')
+    return render_template('login.html', admin=False, params={'admin': False})
 
 
 @app.route('/logout', methods=['GET'])
@@ -576,6 +775,9 @@ def status():
     """
     
     current_identity = get_jwt_identity()
+
+    if is_from_browser(request.user_agent):
+        return jsonify({'msg': 'Forbidden'}), 403
 
     try:
         jreq = request.get_json()
@@ -608,6 +810,9 @@ def notify_bot():
     """
     current_identity = get_jwt_identity()
 
+    if is_from_browser(request.user_agent):
+        return jsonify({'msg': 'Forbidden'}), 403
+
     try:
         jreq = request.get_json()
         msg = jreq['msg']
@@ -621,4 +826,5 @@ def notify_bot():
 
 # Run the app
 if __name__ == "__main__":
+
     app.run(debug=True, host='0.0.0.0')

@@ -3,28 +3,24 @@
 {% block content %}
 
 <div class="row justify-content-center" style="margin-top: 50px;">
+
         <div class="row justify-content-center">
           <div class="col-sm text-center">
-            <button type="button" id="addUserBtn" data-toggle="modal" data-target="#add" class="btn btn-primary btn-lg shadow-lg" data-toggle="modal" data-target="#tokens" style="width: 180px; margin-bottom: 20px;">Add user</button>
-         </div>
-          <div class="col-sm text-center">
-            <button type="button" id="delUserBtn" data-toggle="modal" data-target="#del" class="btn btn-danger btn-lg shadow-lg" data-toggle="modal" data-target="#tokens" style="width: 180px; margin-bottom: 20px;">Remove user</button>
+            <button type="button" id="addUserBtn" data-toggle="modal" data-target="#add" class="btn btn-primary btn-lg shadow-lg" data-toggle="modal" data-target="#tokens" style="width: 180px; margin-bottom: 20px;">Add a User</button>
           </div>
-        </div> 
 
         <!-- Modal -->
         <div class="modal fade" id="add" tabindex="-1" role="dialog" aria-labelledby="tokens" aria-hidden="true">
           <div class="modal-dialog" role="document">
             <div class="modal-content">
               <div class="modal-header">
-                <h5 class="modal-title">Add New</h5>
+                <h5 class="modal-title">Add a User</h5>
                   <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                   </button>
               </div>
               <div class="modal-body">
                 <div class="container-fluid">
-                  <div class="row"><div class="col-sm"><h6 class="text-muted">Add a User</h6></div></div>
                   <form id="newTokenForm">
                   <div class="row">
                       <div class="col-8">
@@ -34,14 +30,7 @@
                         <button type="submit" class="btn btn-primary mb-2" style="width: 90px;">Authorize</button>
                       </div>
                   </div>
-                  <!-- <div class="row">
-                      <div class="col-8">
-                        <input type="text" class="form-control" name="token_duration" required="required" pattern="[0-9]{1,3}" placeholder="Days">
-                      </div>
-                  </div> -->
                   </form>
-                  
-
                 </div>
               </div>
               <div class="modal-footer">
@@ -50,146 +39,24 @@
             </div>
           </div>
         </div>
-        <div class="modal fade" id="del" tabindex="-1" role="dialog" aria-labelledby="tokens" aria-hidden="true">
-          <div class="modal-dialog" role="document">
-            <div class="modal-content">
-              <div class="modal-header">
-                <h5 class="modal-title">Remove</h5>
-                  <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                  </button>
-              </div>
-              <div class="modal-body">
-                <div class="container-fluid">
-                  <div class="row"><div class="col-sm"><h6 class="text-muted">Remove a User</h6></div></div>
-                  <form id="delTokenForm">
-                  <div class="row">
-                      <div class="col-8">
-                        <input type="text" class="form-control" name="username" required="required" pattern="[A-Za-z0-9_-\.]{1,20}" placeholder="Username">
-                      </div>
-                      <div class="col-4 text-center">
-                        <button type="submit" class="btn btn-danger mb-2" style="width: 90px;">Revoke</button>
-                      </div>
-                  </div>
-                  <!-- <div class="row">
-                      <div class="col-8">
-                        <input type="text" class="form-control" name="token_duration" required="required" pattern="[0-9]{1,3}" placeholder="Days">
-                      </div>
-                  </div> -->
-                  </form>
-                  
-
-                </div>
-              </div>
-              <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div> 
+        </div>  
 </div>
+
 <table class="table table-dark" style="max-width: 600px; margin: 0 auto;">
   <thead>
     <tr>
       <th scope="col">#</th>
       <th scope="col">Username</th>
       <th scope="col">Chat ID</th>
+      <th scope="col">Delete</th>
     </tr>
   </thead>
   <tbody>
   </tbody>
 </table>
+
 {% endblock %}
 
 {% block script %}
-    <!-- <script src=" {{ url_for('static', filename='js/tgUsersHandler.js')}}"></script> -->
-<script>
-
-window.onload = async function() {
-    getUsers().then(res => renderToScreen(res)); 
-}
-
-async function getUsers(){
-    let r = await fetch('/api/allTgUsers', {
-        method: 'GET', 
-        cache: 'no-cache',
-        headers: {
-        'Content-Type': 'application/json'
-        },
-    });
-    
-    let val = await r.json();
-    return val;
-}
-
-$("#newTokenForm").submit(async (e) => {
-    e.preventDefault();
-    var form = document.querySelector("#newTokenForm");
-    var username = form.querySelector('input[name="username"]').value;
-
-    var msg = {
-        username: username,
-    };
-
-    let response = await fetch('/api/addTgUser', {
-        method: 'POST', 
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': getCookie('csrf_access_token'),
-        },        
-        credentials: 'same-origin',
-        body: JSON.stringify(msg),
-    });
-
-    let status = await response.status;
-
-    if (status == 200){
-        getUsers().then(res => renderToScreen(res)); 
-    }else{
-        alert("Unable to add new token");
-    }
-});
-
-$("#delTokenForm").submit(async (e) => {
-    e.preventDefault();
-    var form = document.querySelector("#delTokenForm");
-    var username = form.querySelector('input[name="username"]').value;
-
-    var msg = {
-        username: username,
-    };
-
-    let response = await fetch('/api/delTgUser', {
-        method: 'POST', 
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': getCookie('csrf_access_token'),
-        },        
-        credentials: 'same-origin',
-        body: JSON.stringify(msg),
-    });
-
-    let status = await response.status;
-
-    if (status == 200){
-        getUsers().then(res => renderToScreen(res));
-    }else{
-        alert("There's no user with that name");
-    }
-});
-
-function renderToScreen(res){
-  $("tbody").html("");
-  let index = 1;
-  res.forEach(element => {
-      if (element.chat_id == null){
-          element.chat_id = "Unknown";
-      }
-      $("tbody").append("<tr><td scope='row'>" + index + "</td><td>"+element.username+"</td><td>"+element.chat_id + "</td></tr>");
-      index++;
-  });
-}
-
-</script>
+<script src=" {{ url_for('static', filename='js/telegramUsersManager.js')}}"></script>
 {% endblock %}

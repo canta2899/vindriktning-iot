@@ -1,0 +1,317 @@
+{% extends "index.html" %}
+
+{% block content %}
+
+<div class="row justify-content-center" style="margin-top: 50px;">
+
+    <div class="row justify-content-center">
+        <div class="col-sm text-center">
+        <button type="button" id="addUserBtn" data-toggle="modal" data-target="#new" class="btn btn-primary btn-lg shadow-lg" data-toggle="modal" data-target="#tokens" style="width: 180px; margin-bottom: 20px;">Register User</button>
+        </div>
+    <div class="modal fade" id="new" tabindex="-1" role="dialog" aria-labelledby="tokens" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+    <div class="modal-content">
+        <div class="modal-header">
+        <h5 class="modal-title">Add New Profile</h5>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <form id="newUser">
+        <div class="modal-body">
+        <div class="container-fluid">
+                <div class="form-group row">
+                    <label for="username" class="col-sm-4 col-form-label">Username</label>
+                    <div class="col-sm-8">
+                    <input type="username" class="form-control" name="newusername" id="newusername" placeholder="User's name">
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label for="newpass1" class="col-sm-4 col-form-label">New Password</label>
+                    <div class="col-sm-8">
+                    <input type="password" class="form-control" name="usernewpass1" id="usernewpass1" placeholder="Password">
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label for="newpass2" class="col-sm-4 col-form-label">Repeat Password</label>
+                    <div class="col-sm-8">
+                    <input type="password" class="form-control" name="usernewpass2" id="usernewpass2" placeholder="Password">
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <!-- <div class="col-sm-3">Administration</div> -->
+                    <div class="col-sm-8">
+                    <div class="form-check">
+                        <input class="form-check-input" name="usernewadmin" type="checkbox" id="usernewadmin">
+                        <label class="form-check-label" for="useradmin">
+                            The user is admin
+                        </label>
+                    </div>
+                    </div>
+                </div>
+                <br/>
+                <div class="form-group row">
+                    <label for="reqpass" class="col-sm-4 col-form-label">Your Password</label>
+                    <div class="col-sm-8">
+                    <input type="password" name="newreqpass" class="form-control" id="newreqpass" placeholder="Password">
+                    </div>
+                </div>
+        </div>
+        </div>
+        <div class="modal-footer">
+            <button type="submit" class="btn btn-primary">Commit changes</button>
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        </div>
+
+        </form>
+    </div>
+    </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal fade" id="edit" tabindex="-1" role="dialog" aria-labelledby="tokens" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+            <h5 class="modal-title">Edit User Profile</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+
+            <form id="userUpdate">
+            <div class="modal-body">
+            <div class="container-fluid">
+                    <div class="form-group row">
+                        <label for="username" class="col-sm-4 col-form-label">Username</label>
+                        <div class="col-sm-8">
+                        <input type="username" id="edituser" class="form-control" name="username" id="username" placeholder="User's name" readonly>
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <label for="newpass1" class="col-sm-4 col-form-label">New Password</label>
+                        <div class="col-sm-8">
+                        <input type="password" class="form-control" name="newpass1" id="newpass1" placeholder="Password">
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <label for="newpass2" class="col-sm-4 col-form-label">Repeat Password</label>
+                        <div class="col-sm-8">
+                        <input type="password" class="form-control" name="newpass2" id="newpass2" placeholder="Password">
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <!-- <div class="col-sm-3">Administration</div> -->
+                        <div class="col-sm-8">
+                        <div class="form-check">
+                            <input class="form-check-input" name="useradmin" type="checkbox" id="useradmin">
+                            <label class="form-check-label" for="useradmin">
+                                The user is admin
+                            </label>
+                        </div>
+                        </div>
+                    </div>
+                    <br/>
+                    <div class="form-group row">
+                        <label for="reqpass" class="col-sm-4 col-form-label">Your Password</label>
+                        <div class="col-sm-8">
+                        <input type="password" name="reqpass" class="form-control" id="reqpass" placeholder="Password">
+                        </div>
+                    </div>
+            </div>
+            </div>
+            <div class="modal-footer">
+                <button type="submit" class="btn btn-primary">Commit changes</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+
+            </form>
+        </div>
+        </div>
+    </div>
+    </div>  
+</div>
+<table class="table table-dark" style="max-width: 600px; margin: 0 auto;">
+  <thead>
+    <tr>
+      <th scope="col">#</th>
+      <th scope="col">Username</th>
+      <th scope="col">Admin</th>
+      <th scope="col">Settings</th>
+      <th scope="col">Delete</th>
+    </tr>
+  </thead>
+  <tbody id="usersTable">
+  </tbody>
+</table>
+{% endblock %}
+
+{% block script %}
+<script>
+
+window.onload = async function(){
+    getDBUsers().then(d => {
+        renderToScreen(d)
+    })
+}
+
+async function getDBUsers(){
+    let res = await fetch('/api/users', {
+        method: 'GET',
+        cache: 'no-cache',
+        header: {
+            'Content-Tye': 'application/json'
+        }
+    });
+
+    return await res.json();
+}
+
+async function updateUser(data){
+    let res = await fetch('/api/users',{
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': getCookie('csrf_access_token'),
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(data)
+    })
+
+    return res
+}
+
+$("#userUpdate").submit(function(e){
+    e.preventDefault();
+    let form = $(this).serializeJSON();
+    data = {
+        username: form.username,
+        newPassword: form.newpass1,
+        reqPassword: form.reqpass,
+        newAdmin: form.useradmin === "on"
+    }
+
+    $.ajax({
+        method: 'PUT',
+        url: '/api/users',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': getCookie('csrf_access_token'),
+        },
+        credentials: 'same-origin',
+        data: JSON.stringify(data),
+        success: function(){
+            getDBUsers().then(d => renderToScreen(d));
+            $("#edit").modal('hide');
+        },
+        error: function(){
+            alert("An error happened");
+        }  
+    })
+});
+
+$("#newUser").submit(function(e){
+
+  e.preventDefault();
+  let form = $(this).serializeJSON();
+
+  data = {
+    username: form.newusername,
+    newPassword: form.usernewpass1,
+    reqPassword: form.newreqpass,
+    newAdmin: form.usernewadmin === 'on'
+  }
+
+  console.log(data);
+
+  $.ajax({
+        method: 'POST',
+        url: '/api/users',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': getCookie('csrf_access_token'),
+        },
+        credentials: 'same-origin',
+        data: JSON.stringify(data),
+        success: function(){
+            getDBUsers().then(d => renderToScreen(d));
+            $("#new").modal('hide');
+        },
+        error: function(){
+            alert("An error happened");
+        }
+  })
+
+});
+
+function renderToScreen(res){
+  $("tbody").html("");
+  let index = 1;
+  res.forEach(element => {
+    if (element.is_admin){
+        element.is_admin = "Yes";
+    }else{
+        element.is_admin = "No";
+    }
+
+    let table = document.getElementById("usersTable")
+    let row = table.insertRow(0);
+    row.setAttribute('data-username', element.username);
+
+    let cell1 = row.insertCell(0);
+    cell1.classList.add('align-middle');
+    cell1.setAttribute('class', 'align-middle');
+    cell1.setAttribute('scope', 'row');
+    cell1.innerHTML = index;
+
+    let cell2 = row.insertCell(1);
+    cell2.setAttribute('class', 'align-middle');
+    cell2.setAttribute('scope', 'row');
+    cell2.innerHTML = element.username;
+
+    let cell3 = row.insertCell(2);
+    cell3.setAttribute('class', 'align-middle');
+    cell3.innerHTML = element.is_admin
+
+    let cell4 = row.insertCell(3);
+    cell4.innerHTML = '<button type="button" class="btn btn-secondary usersettings"><i class="bi bi-gear-wide"></i></button>';
+
+    let cell5 = row.insertCell(4);
+    cell5.innerHTML = '<button type="button" class="btn btn-danger deleter"><i class="bi bi-trash"></i></button>';
+
+
+    index++;
+
+
+  });
+    $(".usersettings").on('click', (e) => {
+        $("#edit").modal('show');
+        let username = $(e.target).closest("tr").data('username');
+        $("#edituser").val(username);
+    })
+
+    $(".deleter").on('click', (e) => {
+        let username = $(e.target).closest("tr").data('username');
+
+        $.ajax({
+            method: 'DELETE',
+            url: '/api/users',
+            headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': getCookie('csrf_access_token'),
+            },
+            credentials: 'same-origin',
+            data: JSON.stringify({username: username}),
+            success: function() {
+                getDBUsers().then(d => renderToScreen(d))
+            },
+            error: function() {
+                alert("An error happened")
+            }
+        })
+    })
+}
+
+</script>
+{% endblock %}

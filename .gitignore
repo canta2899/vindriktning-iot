@@ -8,3 +8,4 @@ env/
 reset
 todos.txt
 timesyncscript.txt
+monitortool/app/run.sh
