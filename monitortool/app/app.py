@@ -37,27 +37,27 @@ import os
 
 from bot import Bot
 
-# APP_NAME = os.environ['AUTH_APPNAME']
-# APP_SECRET = os.environ['AUTH_APPPASS']
+APP_NAME = os.environ['AUTH_APPNAME']
+APP_SECRET = os.environ['AUTH_APPPASS']
 APP_ID = "engineapp"
 
-APP_NAME = 'prova'
-APP_SECRET = 'test'
+# APP_NAME = 'prova'
+# APP_SECRET = 'test'
 
 TOKENS_FILE = '/tokens/tokens.json'
 INFLUX_DB_DATABASE = 'airquality'
 
-# INFLUX_DB_USER = os.environ['INFLUXDB_API_USER'] 
-# INFLUX_DB_PASSWORD = os.environ['INFLUXDB_API_PASSWORD']
-# INFLUX_DB_HOST = 'database'         
-# INFLUX_DB_PORT = 8086
-# TELEGRAM_BOT_TOKEN = os.environ['TELEGRAM_BOT_TOKEN'] 
-
-INFLUX_DB_USER = 'bridge' 
-INFLUX_DB_PASSWORD = 'bridge'
-INFLUX_DB_HOST = 'localhost'         
+INFLUX_DB_USER = os.environ['INFLUXDB_API_USER'] 
+INFLUX_DB_PASSWORD = os.environ['INFLUXDB_API_PASSWORD']
+INFLUX_DB_HOST = 'database'         
 INFLUX_DB_PORT = 8086
-TELEGRAM_BOT_TOKEN = '2097018200:AAHoG4d1yd530euFuCFBRS6AEQ-HeGwzgkY'
+TELEGRAM_BOT_TOKEN = os.environ['TELEGRAM_BOT_TOKEN'] 
+
+# INFLUX_DB_USER = 'bridge' 
+# INFLUX_DB_PASSWORD = 'bridge'
+# INFLUX_DB_HOST = 'localhost'         
+# INFLUX_DB_PORT = 8086
+# TELEGRAM_BOT_TOKEN = '2097018200:AAHoG4d1yd530euFuCFBRS6AEQ-HeGwzgkY'
 
 
 
