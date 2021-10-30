@@ -514,10 +514,31 @@ Il bot reagisce ad alcuni messaggi inviati dall’utente con le seguenti modalit
 -	/info nomeSensore il bot restituisce le informazioni relative al sensore in questione riportando alcuni dati quali:
 -	Sensor Name: nome del sensore in questione
 -	Quality: qualità dell’aria rilevata dal sensore rappresentata da un colore
--	Value: valore effettivo rilevato in interi secoindo la misurazione PM2.5
+-	Value: valore effettivo rilevato in interi secondo la misurazione PM2.5
 In aggiunta a questo messaggio l’utente riceverà anche una legenda per interpretare la qualità notificata, lo stesso presente sul sensore fisico in quel momento. Nel caso in cui all’utente non sia associato alcun sensore oppure il nome riportato da questo non sia corretto, il bot provvederà a inviare un messaggio d’errore nel quale viene specificata la ragione.
 
 Le comunicazioni del sistema tuttavia non si limitano alla necessità d’intervento da parte dell’utente. Infatti, una volta avviato il bot nella maniera sopra indicata, l’utente riceverà delle notifiche nel caso in cui la qualità dell’aria all’interno della stanza dovesse cambiare. Ciò avviene quando il valore misurato dal sensore supera una certa soglia per la quale ne consegue il cambiamento del colore identificativo della qualità rilevata. L’utente e chiunque sia collegato al sensore, riceverà quindi una notifica nella quale il sistema lo avvisa della variazione suggerendo, in caso di necessità, delle azioni da eseguire per migliorare la situazione.
+
+
+
+
+
+# Guida all'utilizzo per l'utente
+
+GUIDA ALL’UTILIZZO PER L’UTENTE
+
+Nel seguente paragrafo saranno riportati i passi che l’utente deve compiere per utilizzare al meglio il prodotto.
+Attivare il dispositivo dando inizio alla configurazione. Una volta acceso questo si troverà in modalità SoftAccessPoint momento in cui l’utente si può connettere direttamente al dispositivo e, una volta effettuato l’accesso alla rete wifi desiderata, specificare all’interno dei campi dedicati alcune informazioni necessarie riportate nell’elenco sottostante: 
+- L’indirizzo IP del Broker MQTT
+- La porta del Broker MQTT
+- Il nome utente e la password per inviare messaggi al Broker
+- Un nome da assegnare allo specifico sensore (si consiglia di sceglierlo in base alla stanza in cui si decide di posizionarlo)
+
+Successivamente posizionare il sensore nel luogo in cui si necessita.
+
+Se si vogliono sfruttare le funzionalità offerte in più rispetto al semplice prodotto IKEA, seguire attentamente le istruzioni riportate in seguito.
+Accedere al monitoring tool con le credenziali fornite in modo da poter osservare i dati raccolti dai sensori installati nel periodo di tempo pari all’ultima settimana. Il livello di autorizzazione definito in questo caso sarà di amministratore; ciò consente di nominare altri utenti aggiungendoli all’elenco nella sezione Telgram della navigation bar mediante il loro username.
+Il passo finale consiste nell’inizializzare il bot su Telegram ed effettuare il binding. Questo permetterà all’utente di ricevere aggiornamenti e interagire con questo, in modo tale da ricevere via messaggio le segnalazioni di superamento dei limiti per i tre diversi livelli di qualità dell’aria rilevata dai sensori. In caso di necessità l’utente può anche rivolgersi al bot chiedendo, attraverso il comando /info nomeSensore, informazioni relative al sensore in questione come l’ultimo valore registrato di qualità e misurazione PM2.5.
 
 ```{=latex}
 % Primo utente amministratore creato quando viene istanziato il container sulla base delle variabili ambientali definite
