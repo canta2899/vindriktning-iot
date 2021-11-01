@@ -15,13 +15,13 @@ services:
       - AUTH_APPPASS=${AUTH_APPPASS}
     depends_on:
       - "broker"
-      - "monitortool"
+      - "airpi"
     restart: always
 
-  monitortool:
+  airpi:
     build:
-      context: ./monitortool
-    container_name: monitortool
+      context: ./airpi
+    container_name: airpi 
     environment:
       - INFLUXDB_API_USER=${INFLUXDB_API_USER}
       - INFLUXDB_API_PASSWORD=${INFLUXDB_API_PASSWORD}
@@ -46,7 +46,6 @@ services:
     ports:
       - "1883:1883"
     volumes:
-      # - ./broker/config:/mosquitto/config
       - ./broker/log:/mosquitto/log
     restart: always
 
@@ -72,7 +71,6 @@ services:
       - "3000:3000"
 
 volumes:
-  tokens:
   grafana:
   db:
 

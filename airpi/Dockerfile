@@ -11,8 +11,6 @@ RUN pip3 install --no-cache --upgrade influxdb
 RUN pip3 install --no-cache --upgrade flask_sqlalchemy
 RUN pip3 install --no-cache --upgrade flask_jwt_extended
 RUN pip3 install --no-cache --upgrade passlib
-RUN pip3 install --no-cache --upgrade influxdb
-
 
 RUN mkdir /app
 RUN mkdir /log

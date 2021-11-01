@@ -1,3 +1,6 @@
+// Relies on chart.js and users Line and Bar chart
+
+// Gets data from the api
 async function getData(param){
     var res = await fetch('/api/data/' + param);
     if (res.status != 200){
@@ -7,46 +10,22 @@ async function getData(param){
     return jsonresponse; 
 }
 
-function getRandomColor() {
-  var letters = '0123456789ABCDEF';
-  var color = '#';
-  for (var i = 0; i < 6; i++) {
-    color += letters[Math.floor(Math.random() * 16)];
-  }
-  return color;
-}
-
-function getRandomColorsList(count){
-    col = []
-    for(let i=0; i<count; i++){
-        col.push(getRandomColor())
-    }
-    return col
-}
-
-dataLine = []
-dataBar = []
-labelBar = []
+dataLine = []          // Points for line plot
+dataBar = []           // points for bar plot
+labelBar = []          // labels for bar plot
 
 var ctxLine, ctxBar, line, bar;
 
+// Gets the canvas from the HTML page
 var canvas = document.getElementById('chart').getContext('2d');
 
+// Renders the line chart on the canvas
 function renderLineChart(){
-    let data = {
-        // labels: labels,
-        datasets: [
-        {
-            label: 'Camera2',
-            data: dataLine,
-            fill: true,
-            tension: 0.8
-        },
-    ]};
-
     line = new Chart(canvas, {
         type: 'line',
-        data: data,
+        data: {
+            datasets: dataLine
+        },
         options: {
             responsive: true,
             elements: {
@@ -103,6 +82,7 @@ function renderLineChart(){
     });
 }
 
+// Renders the bar chart on the canvas
 function renderBarChart(){
 
     let data = {
@@ -163,27 +143,35 @@ function renderBarChart(){
     });
 }
 
+// Gets data for line and bar chart
 async function getAllData(){
-    dataLine = await getData('line');
-    let d = await getData('bar');
-    for(let data of d){
+    let dLine = await getData('line');
+    for(let data of dLine){
+        dataLine.push({
+            label: data.name,
+            data: data.points,
+            fill: true,
+            tension: 0.8
+        })
+    }
+    let dBar = await getData('bar');
+    for(let data of dBar){
         labelBar.push(data.name);
         dataBar.push(data.median);
     }
 }
 
+// On load gets all data and shows line chart
 window.onload = function() {
 
     getAllData().then(() => {
         renderLineChart();
     })
 
-    //$("#line").show();
 }
 
+// When the bar chart button is clicked, changes chart
 $("#barChartBtn").click(e => {
-
-    //$("#line").hide();
     
     line.destroy()
     renderBarChart();
@@ -191,10 +179,9 @@ $("#barChartBtn").click(e => {
     $("#barChartBtn").addClass("btn-light").removeClass("btn-outline-light");
     $("#lineChartBtn").addClass("btn-outline-light").removeClass("btn-light");
 
-    // $("#bar").show();
-    // renderBarChart();
 });
 
+// When the line chart button is clicked, changes chart
 $("#lineChartBtn").click(e => {
 
     bar.destroy()

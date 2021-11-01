@@ -1,4 +1,3 @@
-from re import I
 from flask import (
     Flask,
     render_template,
@@ -24,15 +23,11 @@ from flask_jwt_extended import (
 from flask_jwt_extended.utils import get_current_user, get_jwt_header, set_access_cookies
 from werkzeug.utils import redirect
 
-from secrets import token_urlsafe
 from datetime import datetime, timedelta
 from influxdb import InfluxDBClient
 from flask_sqlalchemy import SQLAlchemy
 from passlib.hash import pbkdf2_sha256
 import json
-import sys
-import signal
-import time
 import os
 
 from bot import Bot
@@ -61,7 +56,7 @@ TELEGRAM_BOT_TOKEN = os.environ['TELEGRAM_BOT_TOKEN']
 
 
 
-LINE = 'select mean("pm25") from "airquality" where time > now() - 10d group by time(2m) fill(none)'
+LINE = 'select mean("pm25") from "airquality" where time > now() - 10d group by time(2m), "name" fill(none)'
 BAR = 'select mean("pm25") from "airquality" where time > now() - 10d group by "name"'
 
 app = Flask(__name__)
@@ -93,7 +88,6 @@ class User(db.Model):
 class TelegramUser(db.Model):
     username = db.Column(db.String(50), primary_key=True)
     chat_id = db.Column(db.Integer, nullable=True)
-    # expiration = db.Column(db.DateTime, default=datetime.utcnow())
 
 
 def bind_callback(chat_id, username, params):
@@ -281,14 +275,16 @@ def get_bot_influx():
 
 
 def defaultconverter(o):
+    
     """
         Defines a datetime converter for json serialization
     """
+    
     if isinstance(o, datetime):
         return o.__str__()
 
         
-# token refresh?
+# Allows to handle the automatic token refresh if desired
 
 # @app.after_request
 # def refresh_expiring_jwts(response):
@@ -335,7 +331,7 @@ def page_not_found(e):
 def expired_token(jwt_header, jwt_payload):
     if is_from_browser(request.user_agent):
         return render_template('login.html', logged=False, params={'admin': False})
-    return jsonify({'msg': 'Token has expired'}), 401
+    return jsonify({'msg': 'Not authorized', 'description': 'Token has expired'}), 401
 
 @app.route('/')
 @jwt_required(optional=True)
@@ -377,11 +373,19 @@ def data():
 
     if not res:
         return {'status': 'data_unreachable'}, 500
-    queried_data = list(res.get_points(measurement='airquality'))
+    
     # get_ts = lambda x: datetime.strptime(x, '%Y-%m-%dT%H:%M:%S%z').timestamp()
-    chart_data = [{'x': q['time'], 'y': q['mean']} for q in queried_data]
+    
+    data = []
+    
+    for key, value in res.items():
+        data.append({
+            'name': key[1]['name'],
+            'points': [{'x': p['time'], 'y': p['mean']} for p in value]
+        })
+
     return Response(
-        json.dumps(chart_data),
+        json.dumps(data),
         mimetype='application/json'
     )
 
@@ -492,12 +496,16 @@ def telegram_users_api():
         
         all_users = TelegramUser.query.all()
         response = [{'username': user.username, 'chat_id': user.chat_id} for user in all_users]
-        return jsonify({'users': response}), 200
+        return jsonify(response), 200
 
 
 @app.route("/api/users", methods=['GET', 'POST', 'DELETE', 'PUT'])
 @jwt_required()
 def users_api():
+    
+    """
+        Allows to create, delete, update users informations
+    """
 
     current_identity = get_jwt_identity()
     if not current_identity:
@@ -601,7 +609,7 @@ def users_api():
 def telegram():
 
     """
-        Renders telegram user page table if authenticated.
+        Sends telegram user page table if authenticated.
         Otherwise redirects to the login page
     """
 
@@ -621,7 +629,7 @@ def telegram():
 def users():
 
     """
-        Renders telegram user page table if authenticated.
+        Sends telegram user page table if authenticated.
         Otherwise redirects to the login page
     """
 
@@ -641,7 +649,7 @@ def users():
 def me():
     
     """
-        Renders user's profile page
+        Sends user's profile page
     """
     
     current_identity = get_jwt_identity()
@@ -701,7 +709,7 @@ def api_me():
 def auth_api():
 
     """
-        AUTHORIZATION ENDPOINT
+        Handles jwt authorization
     """
 
     if is_from_browser(request.user_agent):
@@ -744,7 +752,7 @@ def auth_api():
 def login():
 
     """
-        Renders login page template
+        Sends login page template
     """
 
     current_identity = get_jwt_identity()
