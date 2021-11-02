@@ -656,7 +656,7 @@ Al fine di memorizzare le **credenziali** relative agli utenti in grado di acced
 
 In particolare, è stato impiegato un DBMS SQLite (il cui file di riferimento risulta disponibile al percorso file `/airpi/app/appdb.db`) interrogato per mezzo delle funzionalità fornite dalla liberia **SQLAlchemy** che, in qualità di Object Relational Mapper, permette l'interazione con un generico database relazionale sfruttando caratteristiche proprie del paradigma Object Oriented (facilitando, così, un'eventuale transizione ad un DBMS diverso).
 
-### Gestione degli utenti telegram
+### Gestione degli utenti Telegram
 
 La tabella `telegram_user` della base di dati permette la memorizzazione, tramite apposita richiesta da parte di un utente amministratore, di uno o più nomi utenti relativi a profili Telegram ai quali viene a tutti gli effetti concessa la facoltà di dialogare con il bot implementato. Tuttavia, come delinato in precedenza, il salvataggio nel database del **chat id** relativo ad ogni utente avviene solamente in seguito all'esecuzione del comando `/bind` da parte dell'utente stesso. Tale strategia fornisce una forma di sicurezza **bidirezionale**, in quanto garantisce: 
 
@@ -695,6 +695,112 @@ class User(db.Model):
 ```
 
 ## Monitoring Tool
+
+Come riportato in precedenza, al fine di fornire uno strumento rivolto alla fruizione dei dati raccolti dai sensori e all'amministrazione delle utenze del sistema è stato definito un applicativo web-based denominato **Monitoring Tool**.
+
+L'implementazione dell'app si appoggia alla libreria di templating HTML **Jinja2** integrata in Flask, che permette di inviare al richiedente pagine HTML appositamente formattate. Queste ultime sfruttano, a loro volta, richieste **fetch** (implementate lato client utilizzando il linguaggio JavaScript) per interrogare gli endpoint di AirPI rivolti all'ottenimento delle informazioni necessarie.
+
+Le funzionalità implementate, in particolare, prevedono: 
+
+- Una homepage che, a seguito di una corretta autenticazione da parte dell'utente, permette la visualizzazione di grafici riassuntivi in relazione all'andamento della qualità dell'aria nelle ultime 24 ore
+- Una pagina per l'aggiunta e la rimozione di utenti Telegram in grado di dialogare con il bot (accessibile solo ad utenti amministratori)
+- Una pagina per la creazione, modifica e rimozione di utenti (accessibile solo ad utenti amministratori)
+- Una pagina per la modifica delle credenziali relative al proprio profilo 
+- Una pagina per permettere il log-in agli utenti autorizzati
+
+### Barra di Navigazione
+
+L'accesso alle funzionalità previste da **Monitoring Tool** è permesso dall'apposita barra di navigazione, che presenta un insieme di opzioni diverse sulla base del livello di autenticazione dell'utente. In particolare,
+
+- Nel caso di utenti non autenticati, non risulta presente alcuna voce
+- Nel caso di utenti autenticati e non amministratori, risultano accessibili:
+	- La pagina principale
+	- La pagina di configurazione del profilo
+	- L'opzione di Logout
+- Nel caso di utenti autenticati e amministratori, risultano accessibili:
+	- La pagina principale
+	- La pagina di configurazione delle utenze Telegram
+	- La pagina di configurazione delle utenze di Monitoring Tool
+	- La pagina di configurazione del profilo
+	- L'opzione di Logout
+
+In particolare, ad ogni pagina corrisponde uno specifico endpoint di AirPI:
+
+| Pagina | Endpoint |
+|--------|----------|
+| Homepage | `/`    |
+| Login  | `/login` |
+| Configurazione utenti  | `/users` |
+| Configurazione utenti telegram  | `/telegram` |
+| Configurazione profilo  | `/me` |
+| Logout | `/logout` |
+
+
+
+### Homepage
+
+La pagina principale (accessibile solamente a seguito di un'autenticazione da parte di utenti amministratori e non) risulta incentrata sulla visualizzazione di due grafici (selezionabili per mezzo degli appositi selettori) riportanti: 
+
+- L'andamento della qualità dell'aria per ogni sensore noto nelle ultime 24 ore (nel caso del diagramma a linee)
+- La qualità media rilevata da ogni sensore nel corso delle ultime 24 ore (nel caso del diagramma a barre)
+
+L'implementazione dei grafici, in particolare, si appoggia alle librerie **chart.js**, **moment.js** e **chartjs-plugin-colorschemes.js**. Il loro popolamento si basa, invece, su apposite richieste `HTTP` di tipo `GET` effettuate agli endpoint `/api/data/line` e `/api/data/bar` definiti da AirPI e accessibili solo previa autenticazione. Questi ultimi prevedono: 
+
+- L'esecuzione di una query parametrizzata all'interno del database InfluxDB
+- L'organizzazione della risposta in un array di oggetti JSON
+- La trasmissione dei dati in risposta alla richiesta
+
+La **query** impiegata per l'ottenimento dei dati necessari alla produzione del diagramma a linee è la seguente: 
+
+|
+|
+
+```sql
+SELECT mean("pm25") 
+FROM "airquality" 
+WHERE time > now() - 24h 
+GROUP BY time(10m), "name" 
+fill(none)'
+```
+
+|
+|
+
+In particolare, la restituzione del valore medio per ogni intervallo di dieci minuti prevista dalla query fornisce un livello di **aggregazione** dei dati serializzati all'interno del database al fine di ridurre la mole di informazioni trasmesse e, successivamente, utilizzate per la produzione e renderizzazione del grafico.
+
+La query impiegata per l'ottenimento dei dati necessari alla produzione del diagramma a barre è, invece, la seguente: 
+
+|
+|
+
+```sql
+SELECT mean("pm25")
+FROM "airquality" 
+WHERE time > now() - 24h 
+GROUP BY "name"
+```
+
+|
+|
+
+### Gestione degli utenti Telegram
+
+La pagina relativa all'abilitazione degli utenti telegram prevede la renderizzazione di un'apposita tabella riportante gli **utenti attualmente abilitati** con annesso **chat id** (se disponibile). Inoltre, la rimozione di un utente è permessa a seguito di un click sull'apposito pulsante di eliminazione dell'utente, mentre l'aggiunta di un nuovo utente è permessa dal form modale accessibile clickando il pulsante riportante la scritta **Add a User**. Quest'ultimo propone un menu a comparsa che permette all'utente di digitare il nome utente da abilitare e inviare la richiesta.
+
+Le operazioni di aggiunta di un nuovo utente, rimozione di un utente esistente e di ottenimento di tutti gli utenti attualmente abilitati sono permesse dall'endpoint `/api/telegram` di AirPI, interrogato rispettivamente da richieste `HTTP` di tipo `POST`, `DELETE` e `GET`. 
+
+In particolare, a seguito di ogni richiesta vengono apportate le dovute modifiche all'interno della tabella **TelegramUser** del database relazionale impiegato per l'organizzazione delle utenze.
+
+
+### Gestione degli utenti di Monitoring Tool
+
+Utenti
+
+La pagina relativa all'abilitazione degli utenti telegram prevede la renderizzazione di un'apposita tabella riportante gli **utenti attualmente abilitati** con annesso **chat id** (se disponibile). Inoltre, la rimozione di un utente è permessa a seguito di un click sull'apposito pulsante di eliminazione dell'utente, mentre l'aggiunta di un nuovo utente è permessa dal form modale accessibile clickando il pulsante riportante la scritta **Add a User**. Quest'ultimo propone un menu a comparsa che permette all'utente di digitare il nome utente da abilitare e inviare la richiesta.
+
+Le operazioni di aggiunta di un nuovo utente, rimozione di un utente esistente e di ottenimento di tutti gli utenti attualmente abilitati sono permesse dall'endpoint `/api/telegram` di AirPI, interrogato rispettivamente da richieste `HTTP` di tipo `POST`, `DELETE` e `GET`.
+
+
 
 
 Al fine di rendere visibili all'utente questi dati è stato realizzato un **monitoring tool** disponibile sulla porta 8000 del localhost. L'home page si presenta incentrata sulla visualizzazione del grafico riportante l'andamento dei rilevamenti effettuati dalla stazione nelle ultime 24 ore. Di fianco a questo è collocato un riquadro composto da due parti selezionabili attraverso cui l'utente può decidere il tipo di grafico da visualizzare, fornendo così, in alternativa al grafico precedentemente descritto, un barplot, denominato 'Average Chart' riportante la mediana relativa a ciascun sensore, raffigurante i valori raccolti nello stesso intervallo di tempo.
