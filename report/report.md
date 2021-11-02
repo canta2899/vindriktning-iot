@@ -295,23 +295,53 @@ Sulla base delle decisioni architetturali riportate in precedenza, è stato scel
 |
 
 ```{dockerfile}
+
 FROM eclipse-mosquitto
 
-ADD ./broker/broker-entrypoint.sh /
+ADD ./config/mosquitto.conf /mosquitto/config
+ADD ./broker-entrypoint.sh /
 
 ENTRYPOINT ["sh", "./broker-entrypoint.sh"]
 
 CMD ["/usr/sbin/mosquitto", "-c", "/mosquitto/config/mosquitto.conf"]
+
 ```
 
 |
 |
 
-A partire dall'immagine disponibile dal repository di *Docker Hub*, è stato aggiunto uno script shell per la configurazione del broker (eseguito come entrypoint all'avvio). L'esecuzione dello script (riportato di seguito) comporta:
+A partire dall'immagine disponibile dal repository di *Docker Hub*, sono stati aggiunti:
 
-- L'attribuzione dei corretti permessi alle cartelle relative alla configurazione di Mosquitto
-- La verifica della presenza di un nome utente e una password all'avvio del container
-- La definizione delle credenziali tramite l'utility `mosquitto_passwd`
+- Il file `mosquitto.conf`, che letto all'avvio del servizio permette: 
+	- L'abilitazione della persistenza dei dati all'interno di un'apposita directory interna al container
+	- La definizione di una destinazione per i file di log scritti dal Broker
+	- La specifica della porta utilizzata e di un modello di autenticazione
+
+|
+|
+
+```bash
+    
+persistence true
+persistence_location /mosquitto/data
+
+user mosquitto
+
+log_dest file /mosquitto/log/mosquitto.log
+log_dest stdout
+
+listener 1883
+allow_anonymous true
+password_file passwordfile
+
+```
+
+\newpage
+
+- Lo script `broker-entrypoint.sh` (eseguito come entrypoint all'avvio), la cui esecuzione comporta:
+	- L'attribuzione dei corretti permessi alle cartelle relative alla configurazione di Mosquitto
+	- La verifica della presenza di un nome utente e una password all'avvio del container
+	- La definizione delle credenziali tramite l'utility `mosquitto_passwd`
 
 |
 |
@@ -343,6 +373,7 @@ exec "$@"
 
 Una volta eseguito, il servizio risulterà accessibile alla porta 1883 del container.
 
+\newpage
 
 # Ricezione dei dati
 
@@ -375,15 +406,14 @@ RUN pip3 install --no-cache --upgrade paho-mqtt
 RUN pip3 install --no-cache --upgrade requests
 RUN mkdir /log
 
-ADD ./engine/engine.py /
-ADD ./engine/entrypoint.sh /
+ADD ./engine.py /
+ADD ./entrypoint.sh /
 
 ENTRYPOINT ["sh", "/entrypoint.sh"]
 
 CMD ["python3", "/engine.py"]
 
 ```
-
 
 |
 |
@@ -394,13 +424,16 @@ Lo script `entrypoint.sh` esegue le seguenti istruzioni al fine di mantenere dis
 |
 
 ```bash
+
+set -e
+
+mkdir -p /log
+touch /log/logfile.log
 cp /log/logfile.log /log/report.log
 cat /dev/null > /log/logfile.log
-python3 /engine.py
-```
+exec "$@"
 
-|
-|
+```
 
 Il codice sorgente dell'applicativo è consultabile al path `engine/engine.py` della repository.
 
@@ -440,7 +473,7 @@ Tali parametri vengono codificati dalle seguenti variabili d'ambiente:
 
 ## Scelta del DBMS
 
-Al fine di permettere il salvataggio e la successiva fruizione dei dati, è stata impiegata una base di dati organizzata come servizio indipendente, anch'esso containerizzato. In particolare, è stata scelta l'adozione del DBMS **InfluxDB** sulla base della risposta alle seguenti necessità:
+Al fine di permettere il salvataggio e la successiva fruizione dei dati, è stata impiegata una base di dati organizzata come servizio indipendente, anch'esso containerizzato. In particolare, è stata scelta l'adozione del DBMS **InfluxDB** in risposta alle seguenti necessità:
 
 - Organizzazione dei dati orientata ai **timestamp** 
 - Definizione di una **retention policy** al fine di permettere l'eliminazione dei dati al di fuori del periodo di interesse 
@@ -453,8 +486,10 @@ La containerizzazione del servizio ha richiesto la sola definizione del seguente
 |
 
 ```Dockerfile
+
 FROM influxdb:1.8
-ADD ./influxdb/createdb.iql /docker-entrypoint-initdb.d/
+ADD ./createdb.iql /docker-entrypoint-initdb.d/
+
 ```
 
 |
@@ -463,19 +498,21 @@ ADD ./influxdb/createdb.iql /docker-entrypoint-initdb.d/
 In particolare, lo script `createdb.iql` (il cui contenuto è di seguito riportato) prevede la definizione di:
 
 - Un database denominato `airquality` con retention-policy pari a 7 giorni
-- Un utente con permessi di scrittura e lettura sulla base di dati 
+- Un utente con permessi di scrittura e lettura sulla base di dati
 - Un utente con permessi di sola lettura sulla base di dati 
 
 |
 |
 
 ```sql
+
 CREATE DATABASE airquality WITH DURATION 7d
 CREATE USER api WITH PASSWORD 'apisecret'
 CREATE USER reader WITH PASSWORD 'read'
 GRANT READ ON airquality to api 
 GRANT READ ON airquality to reader 
 GRANT WRITE ON airquality to api 
+
 ```
 
 |
@@ -485,12 +522,175 @@ Una volta avviato, il servizio risulterà disponibile all'uso ed accessibile tra
 
 \newpage
 
-
 # AirPI
+
+Al fine di fornire uno strumento per la **ricezione centralizzata dei dati** e l'invio di **notifiche in tempo reale** all'utilizzatore, è stato implementato il servizio **AirPI**. Quest'ultimo è costituito da un'API di tipo REST (implementata tramite il microframework Flask), che può essere amministrata e configurata da uno o più utenti tramite un apposito applicativo web-based denominato **VINDRKTNING Station - Monitoring Tool**.  
+
+## Autenticazione
+
+Al fine di permettere la ricezione di dati e aggiornamenti da parte dei soli servizi Engine autorizzati e al fine di garantire l'amministrazione del sistema ai soli utenti autorizzati, AirPI presenta un sistema di **autenticazione** basato su **JSON Web Tokens**, implementato tramite il middleware **flask_jwt_extended**.
+
+Eventuali richieste ed aggiornamenti provenienti da servizi Engine richiedono, pertanto, la presenza di un apposito **token** all'interno dell'header della richiesta. Quest'ultimo presenta una durata limitata e può essere richiesto, in cambio di apposite credenziali, interrogando l'endpoint di autenticazione `/api/auth`. Allo stesso modo, l'accesso agli endpoint utilizzati dall'applicativo Monitoring Tool richiede un token, ottenuto in seguito ad avvenuto log-in per mezzo di username e password.
+
+## Ricezione e serializzazione dei dati 
+
+La ricezione di aggiornamenti relativi ai sensori e alla qualità rilevata avviene per mezzo di richieste `HTTP` di tipo `POST` tramite gli endpoint:
+
+- `/api/airquality` (predisposto alla ricezione di una nuova rilevazione)
+- `/api/status` (predisposto alla registrazione di una variazione di stato da parte di uno specifico sensore)
+
+In seguito ad una verifica della loro autenticità, i dati ricevuti vengono scritti all'interno dell'apposito database tramite apposite query di inserimento. La connessione e la successiva comunicazione con il DBMS dipendono dalla libreria **InfluxDBClient**, la quale permette l'istanziazione di una connessione con il database e il successivo inserimento dati tramite il metodo `write_points()`.
+
+## Notifica degli utenti
+
+### Bot Telegram 
+
+Al fine di poter notificare gli utenti in tempo reale nel caso di variazioni notevoli della qualità dell'aria misurata dai sensori, è stato definito un **Bot Telegram** in grado di:
+
+- Comunicare variazioni di qualità tramite messaggi inviati agli utenti iscritti
+- Permettere agli utenti la verifica dello stato del sistema tramite semplici comandi
+
+### Implementazione 
+
+Considerato il limitato insieme di funzionalità necessarie, l'implementazione del bot non si appoggia a librerie esterne ed è consultabile al percorso file `airpi/app/bot.py`. In particolare, la ricezione di nuovi messaggi avviene tramite una costante attività di **long polling** all'endpoint `getUpdates` dell'API di Telegram, mentre l'invio di eventuali risposte e notifiche avviene tramite apposite richieste all'endpoint `sendMessage`.
+
+Il bot può essere istanziato come di seguito, utilizzando come **token** quello fornito da **BotFather** in seguito alla procedura di creazione del bot fornita da Telegram.
+
+```python
+
+from bot import Bot
+
+b = Bot('token-provided-by-telegram')
+
+```
+
+|
+|
+
+Successivamente, è possibile definire apposite funzioni di callback da eseguire in seguito alla ricezione di specifici messaggi. In particolare, la specifica avviene secondo lo schema seguente.
+
+```python
+
+def callback_routine(chat_id, username, params):
+	# pass
+
+b.on('/command', callback_routine)
+
+```
+
+|
+|
+
+L'invio di messaggi è, infine, reso disponibile tramite il metodo `push_notification`, che prevede la presenza di due parametri in riferimento al contenuto del messaggio e al gruppo di uno o più utenti a cui recapitarlo (identificati dal rispettivo chat id). 
+
+```python
+
+b.push_notification('message', [chat_id1, ..., chat_idN])
+
+```
+
+### Comandi implementati
+
+Sulla base delle funzionalità necessarie, nel caso di AirPI sono stati implementati i seguenti comandi:
+
+- `/status` (permette all'utente di ottenere informazioni sullo stato dei sensori noti)
+- `/info [sensorName]` (permette di ottenere l'ultima rilevazione effettuata da sensori avente nome corrispondente)
+- `/bind` (permette agli utenti abilitati di attivare la ricezione di notifiche)
+- `/start` (permette l'invio di un messaggio all'inizio della conversazione)
+
+### Invio di notifiche
+
+L'invio di specifici messaggi di notifica avviene in seguito ad apposite richieste `HTTP` di tipo `POST` inviate all'endpoint `/api/bot/notification` dal servizio Engine, specificando il messaggio da trasmettere a tutti gli utenti che hanno, in precedenza, eseguito il comando `/bind`. In particolare, come trattato in precedenza, l'implementazione di Engine prevede l'invio di uno dei seguenti messaggi ad ogni variazione di **classe di qualità** rilevata da un'unità VINDRKTNING:
+
+| Messaggio | Classe di qualità |
+|-----------|-------------------|
+|The air quality in [sensorName] is getting good | 0 |
+|The air quality in [sensorName] is getting unpleasant | 1 |
+|The air quality in [sensorName] is getting unacceptable | 2 |
+
+### Esempio di conversazione
+
+Di seguito viene riportato un esempio di conversazione, nel corso della quale: 
+
+1. Viene eseguito il comando start (chiamato automaticamente all'inizio di una conversazione con un bot)
+2. Viene eseguito il comando `/bind` per l'utente
+3. Viene richiesto lo stato dei sensori noti
+4. Vengono richieste informazioni relative al sensore `Camera2`
+5. Viene ricevuta una notifica relativa ad un peggioramento della qualità dell'aria
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=200px]{img/conversation.png}
+\end{figure}
+
+Si osserva, in particolare, come in risposta al comando `/info` l'utente riceva in risposta i parametri:
+
+- **Sensor Name** (nome del sensore in questione) 
+- **Quality** (classe di qualità rilevata, rappresentata dal rispettivo colore attualmente attivo sul sensore)
+ - **Value** (valore assoluto relativo alla misurazione PM2.5 effettuata dal sensore) 
+
+Questi ultimi vengono ottenuti per mezzo della seguente query InfluxDB che, eseguita tramite InfluxDBClient, permette di ottenere la più recente rilevazione serializzata nel corso dell'ultimo minuto in relazione ad uno specifico sensore:
+
+```sql
+SELECT last("pm25"), "quality" 
+FROM "airquality" 
+WHERE time > now() - 1m AND 
+"name"=sensorName
+```
+
+Inoltre, si specifica come la trasmissione di notifiche coincida con il superamento di specifiche soglie (indicate nel manuale d'uso di VINDRIKTNING) per le quali consegue il cambiamento del colore identificativo della qualità rilevata.
+
+Infine, l'invio di messaggi non riconosciuti e/o malformati, oppure l'invio di messaggi da parte di utenti non autorizzati, non solleva alcuna reazione da parte del bot.
+
+## Gestione delle utenze
+
+### Integrazione di un database relazionale
+
+Al fine di memorizzare le **credenziali** relative agli utenti in grado di accedere all'applicativo web-based e i **nominativi** degli utenti telegram in grado di interagire con il bot telegram, è stato integrato l'utilizzo di un database relazionale all'interno dell'implementazione di AirPI. 
+
+In particolare, è stato impiegato un DBMS SQLite (il cui file di riferimento risulta disponibile al percorso file `/airpi/app/appdb.db`) interrogato per mezzo delle funzionalità fornite dalla liberia **SQLAlchemy** che, in qualità di Object Relational Mapper, permette l'interazione con un generico database relazionale sfruttando caratteristiche proprie del paradigma Object Oriented (facilitando, così, un'eventuale transizione ad un DBMS diverso).
+
+### Gestione degli utenti telegram
+
+La tabella `telegram_user` della base di dati permette la memorizzazione, tramite apposita richiesta da parte di un utente amministratore, di uno o più nomi utenti relativi a profili Telegram ai quali viene a tutti gli effetti concessa la facoltà di dialogare con il bot implementato. Tuttavia, come delinato in precedenza, il salvataggio nel database del **chat id** relativo ad ogni utente avviene solamente in seguito all'esecuzione del comando `/bind` da parte dell'utente stesso. Tale strategia fornisce una forma di sicurezza **bidirezionale**, in quanto garantisce: 
+
+- Che utenti non abilitati non possano comunicare con il bot
+- Che un amministratore non possa sfruttare il bot per inviare messaggi indesiderati
+
+Il modello SQLAlchemy definito per la tabella è il seguente: 
+
+```python
+class TelegramUser(db.Model):
+    username = db.Column(db.String(50), primary_key=True)
+    chat_id = db.Column(db.Integer, nullable=True)
+```
+
+### Gestione degli utenti di Monitoring Tool
+
+La tabella `user` della base di dati permette, invece, la memorizzazione degli utenti abilitati ad accedere al servizio Monitoring Tool. In particolare, per ogni utente vengono definiti: 
+
+- Un nome utente univoco
+- Una password (della quale viene memorizzato un hash computato tramite l'utilizzo di SHA256+Salt)
+- Una flag che definisce se l'utente è di tipo amministratore o meno.
+
+In particolare, gli utenti amministratori si distinguono da quelli regolari in quanto: 
+
+- Presentano la possibilità di aggiungere e rimuovere utenti, o di modificarne le credenziali
+- Presentano la possibilità di abilitare e disabilitare utenti al dialogo con il bot telegram
+
+Il modello SQLAlchemy definito per la tabella è il seguente: 
+
+```python
+class User(db.Model):
+    id = db.Column(db.Integer, db.Sequence('user_id_seq'), primary_key=True)
+    name = db.Column(db.Text, unique=True)
+    password = db.Column(db.Text)
+    is_admin = db.Column(db.Boolean, default=False)
+```
 
 ## Monitoring Tool
 
-Come evidenziato nei capitoli precedenti, il sensore, oltre ad acquisire il valore di qualità dell’aria circostante, è in grado di memorizzare le misurazioni popolando un database, il quale conterrà le informazioni raccolte negli ultimi 7 giorni per poi eliminarle gradualmente.
+
 Al fine di rendere visibili all'utente questi dati è stato realizzato un **monitoring tool** disponibile sulla porta 8000 del localhost. L'home page si presenta incentrata sulla visualizzazione del grafico riportante l'andamento dei rilevamenti effettuati dalla stazione nelle ultime 24 ore. Di fianco a questo è collocato un riquadro composto da due parti selezionabili attraverso cui l'utente può decidere il tipo di grafico da visualizzare, fornendo così, in alternativa al grafico precedentemente descritto, un barplot, denominato 'Average Chart' riportante la mediana relativa a ciascun sensore, raffigurante i valori raccolti nello stesso intervallo di tempo.
 
 Il monitoring tool tuttavia, offre al cliente anche altre funzionalità elencate nella navigation bar come la possibilità di eseguire queries specifiche oppure quella di gestione degli utenti Telegram.
@@ -502,30 +702,7 @@ Nel momento in cui viene istanziato il container, sulla base delle variabili amb
 Così facendo si garantisce un livello di sicurezza da ambo i lati evitando in modo tale sia che utenti estranei possano comunicare con il bot, che quest'ultimo possa inviare messaggi ad utenti che non desiderano riceverli.
 
 
-## Bot Telegram
-
-Come detto in precedenza l’utente ha la possibilità di controllare da remoto la qualità dell’aria della stanza in cui si trova il sensore. Per sfruttare questa funzionalità l’utente, o chi è stato autorizzato da questo mediante user name, deve interagire con un bot Telegram ed in seguito inserire il token corretto richiesto dal programma come livello di autenticazione.
-Il bot reagisce ad alcuni messaggi inviati dall’utente con le seguenti modalità:
--	/token il bot comunica che ha creato un token specifico per l’utente, se questo comando viene inviato nuovamente allora provvederà a crearne uno nuovamente
--	/token tokenSbagliato il bot risponde avvisando il cliente che ‘non esiste un sensore con quel nome’ 
--	/token tokenCorretto il bot registra l’utente ed acconsente all’inizio della conversazione
-- /bind il bot notifica la riuscita dell'operazione esortando l'utente all'interazione
--	/status il bot restituisce lo status corrente dei sensori associati i quali possono essere online oppure offline
--	/info nomeSensore il bot restituisce le informazioni relative al sensore in questione riportando alcuni dati quali:
--	Sensor Name: nome del sensore in questione
--	Quality: qualità dell’aria rilevata dal sensore rappresentata da un colore
--	Value: valore effettivo rilevato in interi secondo la misurazione PM2.5
-In aggiunta a questo messaggio l’utente riceverà anche una legenda per interpretare la qualità notificata, lo stesso presente sul sensore fisico in quel momento. Nel caso in cui all’utente non sia associato alcun sensore oppure il nome riportato da questo non sia corretto, il bot provvederà a inviare un messaggio d’errore nel quale viene specificata la ragione.
-
-Le comunicazioni del sistema tuttavia non si limitano alla necessità d’intervento da parte dell’utente. Infatti, una volta avviato il bot nella maniera sopra indicata, l’utente riceverà delle notifiche nel caso in cui la qualità dell’aria all’interno della stanza dovesse cambiare. Ciò avviene quando il valore misurato dal sensore supera una certa soglia per la quale ne consegue il cambiamento del colore identificativo della qualità rilevata. L’utente e chiunque sia collegato al sensore, riceverà quindi una notifica nella quale il sistema lo avvisa della variazione suggerendo, in caso di necessità, delle azioni da eseguire per migliorare la situazione.
-
-
-
-
-
 # Guida all'utilizzo per l'utente
-
-GUIDA ALL’UTILIZZO PER L’UTENTE
 
 Nel seguente paragrafo saranno riportati i passi che l’utente deve compiere per utilizzare al meglio il prodotto.
 Attivare il dispositivo dando inizio alla configurazione. Una volta acceso questo si troverà in modalità SoftAccessPoint momento in cui l’utente si può connettere direttamente al dispositivo e, una volta effettuato l’accesso alla rete wifi desiderata, specificare all’interno dei campi dedicati alcune informazioni necessarie riportate nell’elenco sottostante: 

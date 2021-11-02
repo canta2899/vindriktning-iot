@@ -21,6 +21,7 @@ from flask_jwt_extended import (
 )
 
 from flask_jwt_extended.utils import get_current_user, get_jwt_header, set_access_cookies
+from requests.sessions import cookiejar_from_dict
 from werkzeug.utils import redirect
 
 from datetime import datetime, timedelta
@@ -34,7 +35,7 @@ from bot import Bot
 
 APP_NAME = os.environ['AUTH_APPNAME']
 APP_SECRET = os.environ['AUTH_APPPASS']
-APP_ID = "engineapp"
+APP_ID = 'engineapp'
 
 # APP_NAME = 'prova'
 # APP_SECRET = 'test'
@@ -55,7 +56,6 @@ TELEGRAM_BOT_TOKEN = os.environ['TELEGRAM_BOT_TOKEN']
 # TELEGRAM_BOT_TOKEN = '2097018200:AAHoG4d1yd530euFuCFBRS6AEQ-HeGwzgkY'
 
 
-
 LINE = 'select mean("pm25") from "airquality" where time > now() - 10d group by time(2m), "name" fill(none)'
 BAR = 'select mean("pm25") from "airquality" where time > now() - 10d group by "name"'
 
@@ -70,7 +70,8 @@ app.config['JWT_REFRESH_COOKIE_PATH'] = '/'
 app.config['JWT_COOKIE_CSRF_PROTECT'] = False # true in production
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=1)
 app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///appdb.db"
-app.config['SECRET_KEY'] = 'secret'
+# python3 -c 'import secrets; print(secrets.token_hex())'
+app.config['SECRET_KEY'] = '7fb209172a3227ceccd8cb27fbbfd50e00257ac4bf43f0b141fa2ebbc384a0b6'
 
 sensor_list = dict()
 influxbot = None
@@ -217,12 +218,24 @@ def info_callback(chat_id, _, params):
     )
 
 
+def start_callback(chat_id, _1, _2):
+    b.push_notification(
+        (
+            "Hi! I'm your VINDRIKTNING bot and I'm ready to help you! 💪🏻 "
+            "Make sure to get yourself listed by an admin user and to run "
+            "/bind in order to receive notifications 😉"
+        ),
+        [chat_id]
+    )
+
+
 # Starts telegram bot definind callbacks endpoints
 
 b = Bot(TELEGRAM_BOT_TOKEN)
 b.on('/status', status_callback)
 b.on('/info', info_callback)
 b.on('/bind', bind_callback)
+b.on('/start', start_callback)
 b.run()
 
 
@@ -321,11 +334,11 @@ def is_from_browser(user_agent):
  
 @app.errorhandler(403)
 def forbidden(e):
-    return render_template('403.html'), 403
+    return render_template('403.html', logged=False, params={'admin': False}), 403
  
 @app.errorhandler(404)
 def page_not_found(e):
-    return render_template('404.html'), 404
+    return render_template('404.html', logged=False, params={'admin': False}), 404
 
 @jwt.expired_token_loader
 def expired_token(jwt_header, jwt_payload):
@@ -353,7 +366,6 @@ def entry_point():
         if not user:
             return redirect('/logout')
         if user.is_admin:
-            print("User is admin")
             params['admin'] = True
         return render_template('charts.html', logged=True, params=params)
     else:
@@ -581,8 +593,6 @@ def users_api():
             jreq = request.get_json()
             username = jreq['username']
         except Exception as e:
-            import traceback
-            traceback.print_exc()
             return jsonify({'msg': 'Bad request'}), 400
         
         if username == requestor.name:
@@ -835,4 +845,4 @@ def notify_bot():
 # Run the app
 if __name__ == "__main__":
 
-    app.run(debug=True, host='0.0.0.0')
+    app.run(debug=True, host='0.0.0.0', port=8080)

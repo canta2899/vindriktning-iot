@@ -47,7 +47,7 @@ import queue
 
     If your bot has to respond your callback can run:
 
-            def callback_function(chat_id, username, params)        
+            def callback_function(chat_id, username, params):
                 # your logic                                      
                 b.push_notification("message", [chat_id])
 

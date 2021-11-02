@@ -31,7 +31,7 @@ services:
       - AUTH_USERNAME=${AUTH_USERNAME}
       - AUTH_USERPASS=${AUTH_USERPASS}
     ports:
-      - "8000:5000"
+      - "8000:8080"
     depends_on:
       - "database"
     restart: always
