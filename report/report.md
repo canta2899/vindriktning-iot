@@ -554,7 +554,7 @@ Al fine di poter notificare gli utenti in tempo reale nel caso di variazioni not
 
 Considerato il limitato insieme di funzionalità necessarie, l'implementazione del bot non si appoggia a librerie esterne ed è consultabile al percorso file `airpi/app/bot.py`. In particolare, la ricezione di nuovi messaggi avviene tramite una costante attività di **long polling** all'endpoint `getUpdates` dell'API di Telegram, mentre l'invio di eventuali risposte e notifiche avviene tramite apposite richieste all'endpoint `sendMessage`.
 
-Il bot può essere istanziato come di seguito, utilizzando come **token** quello fornito da **BotFather** in seguito alla procedura di creazione del bot fornita da Telegram.
+Il bot può essere istanziato come di seguito, utilizzando come **token** quello fornito da **BotFather** in seguito alla procedura di creazione del bot:
 
 ```python
 
@@ -612,8 +612,8 @@ L'invio di specifici messaggi di notifica avviene in seguito ad apposite richies
 
 Di seguito viene riportato un esempio di conversazione, nel corso della quale: 
 
-1. Viene eseguito il comando start (chiamato automaticamente all'inizio di una conversazione con un bot)
-2. Viene eseguito il comando `/bind` per l'utente
+1. Viene eseguito il comando `/start` (chiamato automaticamente all'inizio di una conversazione con un bot)
+2. Viene eseguito il comando `/bind`
 3. Viene richiesto lo stato dei sensori noti
 4. Vengono richieste informazioni relative al sensore `Camera2`
 5. Viene ricevuta una notifica relativa ad un peggioramento della qualità dell'aria
@@ -631,12 +631,18 @@ Si osserva, in particolare, come in risposta al comando `/info` l'utente riceva 
 
 Questi ultimi vengono ottenuti per mezzo della seguente query InfluxDB che, eseguita tramite InfluxDBClient, permette di ottenere la più recente rilevazione serializzata nel corso dell'ultimo minuto in relazione ad uno specifico sensore:
 
+|
+|
+
 ```sql
 SELECT last("pm25"), "quality" 
 FROM "airquality" 
 WHERE time > now() - 1m AND 
 "name"=sensorName
 ```
+
+|
+|
 
 Inoltre, si specifica come la trasmissione di notifiche coincida con il superamento di specifiche soglie (indicate nel manuale d'uso di VINDRIKTNING) per le quali consegue il cambiamento del colore identificativo della qualità rilevata.
 
