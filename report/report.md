@@ -694,11 +694,25 @@ class User(db.Model):
     is_admin = db.Column(db.Boolean, default=False)
 ```
 
+### Struttura della directory
+
+L'implementazione di AirPI è contenuta all'interno del percorso file `airpi/app` e prevede la presenza dei seguenti file:
+
+- `app.py` (contenente l'implementazione di AirPI)
+- `bot.py` (contenente l'implementazione del Bot Telegram)
+- `first_user.py` (contenente uno script finalizzato all'inizializzazione del primo utente del database)
+- `appdb.db` (contenente il database SQLite utilizzato per gestire le utenze)
+- `static`
+	- `static/css` (directory contenente i file CSS utilizzati da Monitoring Tool)
+	- `static/img` (directory contenente le immagini utilizzate da Monitoring Tool)
+	- `static/js` (directory contenente gli script e le librerie JavaScript utilizzate da Monitoring Tool)
+- `templates` (directory contenente i template HTML descrtti tramite Jinja2)
+
 ## Monitoring Tool
 
 Come riportato in precedenza, al fine di fornire uno strumento rivolto alla fruizione dei dati raccolti dai sensori e all'amministrazione delle utenze del sistema è stato definito un applicativo web-based denominato **Monitoring Tool**.
 
-L'implementazione dell'app si appoggia alla libreria di templating HTML **Jinja2** integrata in Flask, che permette di inviare al richiedente pagine HTML appositamente formattate. Queste ultime sfruttano, a loro volta, richieste **fetch** (implementate lato client utilizzando il linguaggio JavaScript) per interrogare gli endpoint di AirPI rivolti all'ottenimento delle informazioni necessarie.
+L'implementazione dell'app si appoggia alla libreria di templating HTML **Jinja2** integrata in Flask, che permette di inviare al richiedente pagine HTML appositamente formattate. Queste ultime sfruttano, a loro volta, richieste **fetch** (implementate lato client utilizzando il linguaggio JavaScript) per interrogare gli endpoint di AirPI rivolti all'ottenimento delle informazioni necessarie. Al fine di ottenere un layout responsive è stato utilizzato il framework **Bootstrap 4**, al quale sono state apportate minime integrazioni all'interno di un apposito file di stile.
 
 Le funzionalità implementate, in particolare, prevedono: 
 
@@ -707,6 +721,7 @@ Le funzionalità implementate, in particolare, prevedono:
 - Una pagina per la creazione, modifica e rimozione di utenti (accessibile solo ad utenti amministratori)
 - Una pagina per la modifica delle credenziali relative al proprio profilo 
 - Una pagina per permettere il log-in agli utenti autorizzati
+
 
 ### Barra di Navigazione
 
@@ -791,28 +806,124 @@ Le operazioni di aggiunta di un nuovo utente, rimozione di un utente esistente e
 
 In particolare, a seguito di ogni richiesta vengono apportate le dovute modifiche all'interno della tabella **TelegramUser** del database relazionale impiegato per l'organizzazione delle utenze.
 
-
 ### Gestione degli utenti di Monitoring Tool
 
-Utenti
+La pagina relativa all'inserimento, rimozione e modifica degli utenti di Monitoring Tool, similmente a quanto illustrato nel caso degli account Telegram, prevede il popolamento di una tabella riportante, per ogni utente, il relativo nome assieme ad un indicatore riferito all'eventuale possesso dei permessi di amministrazione. La rimozione di un utente è possibile tramite l'apposito pulsante di eliminazione, mentre la modifica delle informazioni è permessa da un form modale accessibile clickando sul pulsante di configurazione. La creazione di un nuovo utente è, infine, possibile tramite il form accessibile clickando sul pulsante riportante la scritta **Add New Profile**.
 
-La pagina relativa all'abilitazione degli utenti telegram prevede la renderizzazione di un'apposita tabella riportante gli **utenti attualmente abilitati** con annesso **chat id** (se disponibile). Inoltre, la rimozione di un utente è permessa a seguito di un click sull'apposito pulsante di eliminazione dell'utente, mentre l'aggiunta di un nuovo utente è permessa dal form modale accessibile clickando il pulsante riportante la scritta **Add a User**. Quest'ultimo propone un menu a comparsa che permette all'utente di digitare il nome utente da abilitare e inviare la richiesta.
+Le operazioni di visualizzazione, aggiunta, modifica e rimozione di un utente sono permesse dall'endpoint `/api/users` di AirPI, interrogato rispettivamente da richieste `HTTP` di tipo `GET`, `POST`, `PUT` e `DELETE`. In particolare, a seguito di ogni richiesta vengono apportate le dovute modifiche all'interno della tabella **User** del database relazionale impiegato per l'organizzazione delle utenze.
 
-Le operazioni di aggiunta di un nuovo utente, rimozione di un utente esistente e di ottenimento di tutti gli utenti attualmente abilitati sono permesse dall'endpoint `/api/telegram` di AirPI, interrogato rispettivamente da richieste `HTTP` di tipo `POST`, `DELETE` e `GET`.
+L'endpoint `/api/me` di AirPI permette, infine, ad utenti amministratori e non di apportare modifiche in relazione alle **sole** credenziali del proprio profilo, senza poter variare, però, il livello di permessi associato all'utente.
 
+## Installazione di un server WSGI
 
+Nonostante Flask permetta l'esecuzione di un server di sviluppo tramite l'utility `flask run`, è stato scelto di eseguire AirPI per mezzo di un server di produzione di tipo WSGI al fine di garantire maggiore efficienza, stabilità e sicurezza da parte dell'applicativo. È stata, quindi, impiegata la libreria **Waitress** che, una volta installata tramite `pip`, permette l'esecuzione di un'app Flask tramite il comando: 
 
+```bash
+waitress-serve app:app
+```
 
-Al fine di rendere visibili all'utente questi dati è stato realizzato un **monitoring tool** disponibile sulla porta 8000 del localhost. L'home page si presenta incentrata sulla visualizzazione del grafico riportante l'andamento dei rilevamenti effettuati dalla stazione nelle ultime 24 ore. Di fianco a questo è collocato un riquadro composto da due parti selezionabili attraverso cui l'utente può decidere il tipo di grafico da visualizzare, fornendo così, in alternativa al grafico precedentemente descritto, un barplot, denominato 'Average Chart' riportante la mediana relativa a ciascun sensore, raffigurante i valori raccolti nello stesso intervallo di tempo.
+## Variabili d'ambiente utilizzate
 
-Il monitoring tool tuttavia, offre al cliente anche altre funzionalità elencate nella navigation bar come la possibilità di eseguire queries specifiche oppure quella di gestione degli utenti Telegram.
+Al fine di una corretta esecuzione, l'applicativo prevede la presenza delle seguenti variabili ambientali:
 
-La prima...
+| Variabile | Descrizione |
+|-----------|-------------|
+| `AUTH_APPNAME` | Nome utente del servizio di Engine a fini di autenticazione |
+| `AUTH_APPPASS` | Secret trasmesso dal servizio di Engine a fini di autenticazione |
+| `TELEGRAM_BOT_TOKEN` | Token utilizzato dalla classe `Bot` al fine di controllare il bot telegram creato |
+| `INFLUXDB_API_USER` | Nome utente per connessione ad InfluxDB tramite InfluxDBClient |
+| `INFLUXDB_API_PASSWORD` | Password per connessione ad InfluxDB tramite InfluxDBClient |
+| `AUTH_USERNAME` | Nome utente del primo utente amministratore, creato automaticamente per Monitoring Tool |
+| `AUTH_USERPASS` | Nome utente del primo profile amministratore, creato appositamente per accedere a Monitoring Tool |
+| `AUTH_USERPASS` | Password del primo utente amministratore, creato appositamente per accedere a Monitoring Tool |
 
-La seconda invece, come anticipato, serve alla gestione degli utenti, e dei relativi account Telegram ad essi collegati. 
-Nel momento in cui viene istanziato il container, sulla base delle variabili ambientali definite, si crea il primo utente con privilegi da amministratore. Questo infatti ha la possibilità di aggiungere alla lista, o rimuovere in caso di necessità, alcuni utenti Telegram che potranno consultare la schermata home del monitoring tool, descritta in precedenza. L'amministratore, cliccando sull'apposito pulsante, potrà inserirne lo user name ma solo una volta che l'utente aggiunto entrerà in contatto col bot potrà inviare un messaggio '/bind' per completare l'associazione facendo comparire accanto al nome anche il 'chat id'. In questo modo potrà ricevere le notifiche relative alle misurazioni in tempo reale, incluse quelle di cambiamento di livello qualitativo dell'aria.
-Così facendo si garantisce un livello di sicurezza da ambo i lati evitando in modo tale sia che utenti estranei possano comunicare con il bot, che quest'ultimo possa inviare messaggi ad utenti che non desiderano riceverli.
+## Containerizzazione del servizio
 
+Come per i servizi precedentemente descritti, anche per AirPI è stata adottata una strategia basata sull'utilizzo di Docker al fine di racchiudere il servizio all'interno di un apposito container. A tal fine, a partire dall'immagine ufficiale **Alpine** è stato prodotto il Dockerfile riportato di seguito.
+
+|
+|
+
+```Dockerfile
+
+FROM alpine
+
+RUN apk add --update --no-cache build-base
+RUN apk add --update --no-cache sqlite
+RUN apk add --update --no-cache python3 && ln -sf python3 /usr/bin/python
+RUN python3 -m ensurepip
+RUN apk add py3-sqlalchemy
+RUN pip3 install --no-cache --upgrade pip setuptools
+RUN pip3 install --no-cache --upgrade flask
+RUN pip3 install --no-cache --upgrade influxdb
+RUN pip3 install --no-cache --upgrade flask_sqlalchemy
+RUN pip3 install --no-cache --upgrade flask_jwt_extended
+RUN pip3 install --no-cache --upgrade passlib
+RUN pip3 install --no-cache --upgrade waitress
+
+RUN mkdir /app
+RUN mkdir /log
+
+WORKDIR /app
+
+COPY ./app /app
+COPY ./entrypoint.sh /entrypoint.sh
+
+# RUN export FLASK_APP=app.py
+# RUN export FLASK_ENV=development
+
+ENTRYPOINT ["sh", "/entrypoint.sh"]
+
+# CMD ["flask", "run", "--host=0.0.0.0", "--port=8080"]
+CMD ["waitress-serve", "app:app"]
+
+```
+
+|
+|
+
+Quest'ultimo, in particolare, prevede: 
+
+- L'installazione del package `build-base`, necessario al building di alcune librerie installate nel corso dei passaggi successivi
+- L'installazione di **Python**, **pip** e delle librerie necessarie alla corretta esecuzione dell'applicativo
+- La creazione delle directory predisposte al contenimento del codice sorgente dell'applicativo e di eventuali file di log
+- Il popolamento della cartella `/app` con i file presenti al percorso `airpi/app` della macchina host
+- L'aggiunta dello script `/entrypoint.sh`, consultabile al path `airpi/entrypoint.sh`
+- La definizione dello script di entrypoint all'interno del container
+- La definizione del comando di esecuzione del server di produzione tramite Waitress
+
+Le linee commentate permettono, se opportunamente sostituite al comando finale, l'esecuzione di AirPI per mezzo del server di sviluppo integrato in Flask.
+
+Il comando di entrypoint prevede, invece, l'esecuzione del codice contenuto in `/app/first_user.py` prima dell'avvio dell'applicativo. In particolare, lo script Python (il cui codice è di seguito riportato) prevede, sulla base delle sopracitate variabili d'ambiente `AUTH_USERNAME` e `AUTH_USERPASS`, la configurazione del primo utente amministratore di AirPI.
+
+|
+|
+
+```python
+import sqlite3
+from passlib.hash import pbkdf2_sha256
+import os
+import sys
+
+username = os.environ['AUTH_USERNAME']
+password = os.environ['AUTH_USERPASS']
+
+conn = sqlite3.connect('/app/appdb.db')
+c = conn.cursor()
+
+c.execute(
+	'INSERT INTO user(name, password, is_admin) ' 
+	'VALUES (?,?,1), (username, pbkdf2_sha256.hash(password))'
+)
+
+conn.commit()
+conn.close()
+
+sys.exit(0)
+```
+
+|
+|
 
 # Guida all'utilizzo per l'utente
 
