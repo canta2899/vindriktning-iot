@@ -892,12 +892,7 @@ Quest'ultimo, in particolare, prevede:
 - La definizione dello script di entrypoint all'interno del container
 - La definizione del comando di esecuzione del server di produzione tramite Waitress
 
-Le linee commentate permettono, se opportunamente sostituite al comando finale, l'esecuzione di AirPI per mezzo del server di sviluppo integrato in Flask.
-
-Il comando di entrypoint prevede, invece, l'esecuzione del codice contenuto in `/app/first_user.py` prima dell'avvio dell'applicativo. In particolare, lo script Python (il cui codice è di seguito riportato) prevede, sulla base delle sopracitate variabili d'ambiente `AUTH_USERNAME` e `AUTH_USERPASS`, la configurazione del primo utente amministratore di AirPI.
-
-|
-|
+Le linee commentate permettono, se opportunamente sostituite al comando finale, l'esecuzione di AirPI per mezzo del server di sviluppo integrato in Flask. Il comando di entrypoint prevede, invece, l'esecuzione del codice contenuto in `/app/first_user.py` prima dell'avvio dell'applicativo. In particolare, lo script Python (il cui codice è di seguito riportato) prevede, sulla base delle sopracitate variabili d'ambiente `AUTH_USERNAME` e `AUTH_USERPASS`, la configurazione del primo utente amministratore di AirPI.
 
 ```python
 import sqlite3
@@ -922,8 +917,125 @@ conn.close()
 sys.exit(0)
 ```
 
+\newpage
+
+# Deployment
+
+Il dispiegamento dei servizi descritti è reso possibile dallo strumento `docker-compose`, che permette la definizione e organizzazione di applicativi multi-container tramite l'apposito file `docker-compose.yaml` consultabile alla root directory della repository. 
+
+In particolare, le due principali soluzioni di deployment risultano: 
+
+1. L'organizzazione di un singolo stack multi-container (ideale per un utilizzo all'interno di una rete domestica)
+2. L'organizzazione di due stack multi-container, al fine di rafforzare l'indipendenza fra i servizi di MQTT Brokering ed Engine e quelli di Database ed AirPI (ideale al fine di poter dispiegare il database InfluxDB ed AirPI nel cloud)
+
+## Aspetti di docker-compose coinvolti
+
+All'interno del file `docker-compose`, per ogni servizio vengono specificati:
+
+- **Dockerfile** e **directory di riferimento** per il build della rispettiva immagine
+- **Politiche di riavvio** dei container in seguito ad errori
+- **Port mapping** (al fine di esporre le porte necessarie all'utilizzo)
+- **Volume mapping** (al fine di mappare su volumi persistenti directory interne ai container) 
+- **Variabili d'ambiente** necessarie all'esecuzione
+- **Nome** dei container
+- **Dipendenze fra container** (al fine di permettere un corretto avvio e spegnimento del sistema, oltre che un comportamento consistente dello stack nel caso di errori)
+
+Al fine di agevolare l'eventuale modifica delle variabili d'ambiente necessarie, quest'ultime sono state descritte all'interno di un file `.env` (consultabile all'interno della root directory della repository). Quest'ultimo viene, infatti, automaticamente letto dal file `docker-compose` durante la sua esecuzione.
+
+La specifica delle variabili d'ambiente in `docker-compose.yaml` avviene, pertanto, mediante la sintassi
+
 |
 |
+
+```bash
+- VARIABLE_NAME = ${VARIABLE_NAME_ENVFILE}
+```
+|
+|
+
+Dove `VARIABLE_NAME` riferisce il nome assunto dalla variabile all'interno del container e `VARIABLE_NAME_ENVFILE` riferisce il nome della variabile della quale acquisire il valore specificato all'interno del file `.env`. Nello specifico, al fine di evitare ambiguità, è stato scelto di mantenere identico il nome di ogni variabile rispetto al corrispondente riferimento all'interno del file.
+
+Il risultato finale viene riportato di seguito:
+
+```dockerfile
+
+version: "3"
+services:
+  engine:
+    build:
+      context: ./engine
+    container_name: engine 
+    environment:
+      - MOSQUITTO_USERNAME=${MOSQUITTO_USERNAME}
+      - MOSQUITTO_PASSWORD=${MOSQUITTO_PASSWORD}
+      - SENSOR_STATUS_ENDPOINT=${SENSOR_STATUS_ENDPOINT}
+      - DATA_ENDPOINT=${DATA_ENDPOINT}
+      - NOTIFICATION_ENDPOINT=${NOTIFICATION_ENDPOINT}
+      - AUTH_ENDPOINT=${AUTH_ENDPOINT}
+      - AUTH_APPNAME=${AUTH_APPNAME}
+      - AUTH_APPPASS=${AUTH_APPPASS}
+    depends_on:
+      - "broker"
+      - "airpi"
+    restart: always
+
+  airpi:
+    build:
+      context: ./airpi
+    container_name: airpi 
+    environment:
+      - INFLUXDB_API_USER=${INFLUXDB_API_USER}
+      - INFLUXDB_API_PASSWORD=${INFLUXDB_API_PASSWORD}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - AUTH_APPNAME=${AUTH_APPNAME}
+      - AUTH_APPPASS=${AUTH_APPPASS}
+      - AUTH_USERNAME=${AUTH_USERNAME}
+      - AUTH_USERPASS=${AUTH_USERPASS}
+    ports:
+      - "8000:8080"
+    depends_on:
+      - "database"
+    restart: always
+
+  broker:
+    build:
+      context: ./broker
+    environment:
+      - MOSQUITTO_USERNAME=${MOSQUITTO_USERNAME}
+      - MOSQUITTO_PASSWORD=${MOSQUITTO_PASSWORD}
+    container_name: broker
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./broker/log:/mosquitto/log
+    restart: always
+
+  database:
+    build:
+      context: ./influxdb
+    container_name: database
+    environment:  
+      - INFLUXDB_ADMIN_USER=${INFLUXDB_ADMIN_USER}
+      - INFLUXDB_ADMIN_PASSWORD=${INFLUXDB_ADMIN_PASSWORD}
+    volumes:
+      - db:/var/lib/influxdb
+    restart: always 
+    
+  charts:
+    image: grafana/grafana
+    container_name: charts
+    volumes:
+      - grafana:/var/lib/grafana
+    ports:
+      - "3000:3000"
+
+volumes:
+  grafana:
+  db:
+
+```
+
+\newpage
 
 # Guida all'utilizzo per l'utente
 
