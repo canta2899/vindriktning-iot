@@ -770,6 +770,7 @@ def auth_api():
 
 
 @app.route("/login", methods=['GET'])
+@jwt_required(optional=True)
 def login():
 
     """
@@ -777,7 +778,9 @@ def login():
     """
 
     current_identity = get_jwt_identity()
-    # useridentity = User.query.filter_by(username=current_identity[2:]).first()
+    
+    if current_identity:
+        return redirect('/')
     return render_template('login.html', admin=False, params={'admin': False})
 
 

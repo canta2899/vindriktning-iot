@@ -78,6 +78,8 @@ class ApiComm:
         
         try:
             res = self.session.post(endpoint, json=msg, verify=False) 
+            if res.status_code == 200:
+                return True
             if res.status_code == 401:
                 if self.__getAccessToken():
                     res = self.session.post(self.DATA_ENDPOINT, json=msg, verify=False)
