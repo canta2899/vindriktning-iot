@@ -51,9 +51,11 @@ class ApiComm:
             request = r.post(self.AUTH_ENDPOINT, headers={
                 'appName': self.AUTH_APPNAME,
                 'secret': self.AUTH_PASS
-            })
+            }, verify=False)
         except ConnectionError as e:
             logging.error("Connection error happened while requesting access token. Sleeping 10 seconds")
+            import traceback
+            logging.critical(f"{traceback.format_exc()}")
             time.sleep(10)
         except Exception as e:
             logging.error(f"Couldn't get access token: {e}")
@@ -75,10 +77,10 @@ class ApiComm:
         """
         
         try:
-            res = self.session.post(endpoint, json=msg) 
+            res = self.session.post(endpoint, json=msg, verify=False) 
             if res.status_code == 401:
                 if self.__getAccessToken():
-                    res = self.session.post(self.DATA_ENDPOINT, json=msg)
+                    res = self.session.post(self.DATA_ENDPOINT, json=msg, verify=False)
                     if res.status_code == 200:
                         return True 
         except ConnectionError as e:
@@ -279,6 +281,8 @@ try:
     comm = ApiComm(AUTH_APPNAME, AUTH_PASS)
 except Exception as e:
     logging.critical("Can't authenticate to the api. Closing...")
+    import traceback
+    logging.critical(f"{traceback.format_exc()}")
     sys.exit(1)
 
 sensor_list = dict()    # sensor_list is empty at start
