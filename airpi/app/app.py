@@ -22,7 +22,6 @@ from flask_jwt_extended import (
 )
 
 from flask_jwt_extended.utils import get_current_user, get_jwt_header, set_access_cookies
-from requests.sessions import cookiejar_from_dict
 from werkzeug.utils import redirect
 
 from datetime import datetime, timedelta
