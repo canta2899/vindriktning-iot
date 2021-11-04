@@ -9,3 +9,4 @@ reset
 todos.txt
 timesyncscript.txt
 monitortool/app/run.sh
+nginx/certificates
