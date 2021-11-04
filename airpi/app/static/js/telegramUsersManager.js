@@ -60,6 +60,7 @@ $("#newTokenForm").submit(e => {
     newUser(msg)
       .then(res => {
         getUsers().then(res => renderToScreen(res));
+        $("#add").modal('hide');
       })
       .catch(err => alert("An error happened"))
 });

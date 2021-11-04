@@ -5,7 +5,8 @@ from flask import (
     request,
     g, 
     jsonify, 
-    redirect
+    redirect,
+    url_for
 )
 
 from flask_jwt_extended import (
@@ -30,8 +31,11 @@ from flask_sqlalchemy import SQLAlchemy
 from passlib.hash import pbkdf2_sha256
 import json
 import os
+from waitress import serve
 
 from bot import Bot
+
+USE_WSGI = True
 
 APP_NAME = os.environ['AUTH_APPNAME']
 APP_SECRET = os.environ['AUTH_APPPASS']
@@ -53,7 +57,7 @@ TELEGRAM_BOT_TOKEN = os.environ['TELEGRAM_BOT_TOKEN']
 # INFLUX_DB_PASSWORD = 'bridge'
 # INFLUX_DB_HOST = 'localhost'         
 # INFLUX_DB_PORT = 8086
-# TELEGRAM_BOT_TOKEN = '2097018200:AAHoG4d1yd530euFuCFBRS6AEQ-HeGwzgkY'
+# TELEGRAM_BOT_TOKEN = 'past-here-your-token'
 
 
 LINE = 'select mean("pm25") from "airquality" where time > now() - 10d group by time(2m), "name" fill(none)'
@@ -62,12 +66,12 @@ BAR = 'select mean("pm25") from "airquality" where time > now() - 10d group by "
 app = Flask(__name__)
 jwt = JWTManager(app)
 
-app.config["JWT_COOKIE_SECURE"] = False  # true in production
+app.config["JWT_COOKIE_SECURE"] = True  # true in production, false in development
 app.config["JWT_TOKEN_LOCATION"] = ["headers", "cookies"]
 app.config["JWT_SECRET_KEY"] = "secret"
 app.config['JWT_ACCESS_COOKIE_PATH'] = '/'
 app.config['JWT_REFRESH_COOKIE_PATH'] = '/'
-app.config['JWT_COOKIE_CSRF_PROTECT'] = False # true in production
+app.config['JWT_COOKIE_CSRF_PROTECT'] = True # true in production, false in development
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=1)
 app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///appdb.db"
 # python3 -c 'import secrets; print(secrets.token_hex())'
@@ -452,6 +456,17 @@ def airquality():
 def telegram_users_api():
 
     current_identity = get_jwt_identity()
+    
+    if not current_identity:
+        return redirect('/login')
+
+    requestor = User.query.filter_by(id=current_identity).first()
+
+    if not requestor:
+        return redirect('/')
+
+    if not requestor.is_admin:
+        return redirect('/')
 
     if request.method == 'POST':
 
@@ -547,12 +562,12 @@ def users_api():
             return jsonify({'msg': 'Bad request'}), 400
         
         if not pbkdf2_sha256.verify(password, requestor.password):
-            return jsonify({'msg': 'WrVong password'}), 401
+            return jsonify({'msg': 'Wrong password'}), 401
         
         match = User.query.filter_by(name=username).first()
         
         if not match:
-            new_user = User(name=username, password=pbkdf2_sha256.hash(password), is_admin=is_admin)
+            new_user = User(name=username, password=pbkdf2_sha256.hash(new_password), is_admin=is_admin)
             db.session.add(new_user)
             db.session.commit()
             return jsonify({'msg': 'Added user'}), 200
@@ -564,7 +579,7 @@ def users_api():
             jreq = request.get_json()
             username = jreq['username']
             password = jreq['reqPassword']
-            new_password = jreq['newPassword']
+            new_password = jreq.get('newPassword', None)
             new_is_admin = jreq['newAdmin']
         except Exception as e:
             return jsonify({'msg': 'Bad request'}), 400
@@ -624,14 +639,11 @@ def telegram():
     """
 
     current_identity = get_jwt_identity()
-    params = {
-            'admin': False
-    }
     if current_identity:
         user = User.query.filter_by(id=current_identity).first()
-        params['admin'] = user.is_admin
-        return render_template('telegram.html', logged=True, params=params)
-    return render_template('login.html', logged=False, params=params)
+        if user.is_admin:
+            return render_template('telegram.html', logged=True, params={'admin': True})
+    return redirect('/')
 
 
 @app.route("/users", methods=['GET'])
@@ -734,7 +746,7 @@ def auth_api():
         user = User.query.filter_by(name=username).first()
 
         if not user:
-            return jsonify({'msg': 'Unknown user'}), 401
+            return jsonify({'msg': 'Unknown user'}), 409
         
         if not pbkdf2_sha256.verify(password, user.password):
             return jsonify({'msg': 'Wrong password'}), 401
@@ -844,5 +856,9 @@ def notify_bot():
 
 # Run the app
 if __name__ == "__main__":
-
-    app.run(debug=True, host='0.0.0.0', port=8080)
+    if USE_WSGI:
+        # Production server
+        serve(app, host='0.0.0.0', port=8080, url_scheme='https')
+    else:
+        # Development server
+        app.run(debug=True, host='0.0.0.0', port=8080)

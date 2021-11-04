@@ -65,19 +65,36 @@ async function delUser(data){
 $("#userUpdate").submit(function(e){
     e.preventDefault();
     let form = $(this).serializeJSON();
+
+    if(form.newpass1 != form.newpass2){
+        alert("Password don't match!")
+        return;
+    }
+
+    if (form.newpass1 != form.newpass2){
+        alert("Password don't match!");
+        return;
+    }
+
     data = {
         username: form.username,
-        newPassword: form.newpass1,
         reqPassword: form.reqpass,
         newAdmin: form.useradmin === "on"
     }
 
+    if (form.updatepass === "on"){
+        data.newPassword = form.newpass1;
+    }
+
+
     updateUser(data)
     .then(res => {
-        getDBUsers().them(d => renderToScreen(d));
+        getDBUsers().then(d => renderToScreen(d));
+        $("#edit").modal('hide');
     })
-    .catch(res => {
-        aler("An error happend");
+    .catch(err => {
+        console.log(err);
+        alert("An error happend. Make sure to specifiy your password.");
     })
 });
 
@@ -85,6 +102,11 @@ $("#userUpdate").submit(function(e){
 $("#newUser").submit(function(e){
   e.preventDefault();
   let form = $(this).serializeJSON();
+
+  if (form.usernewpass1 != form.usernewpass2){
+      alert("Password don't match!")
+      return;
+  }
 
   data = {
     username: form.newusername,
@@ -96,6 +118,7 @@ $("#newUser").submit(function(e){
   newUser(data)
   .then(res => {
       getDBUsers().then(d => renderToScreen(d));
+      $("#new").modal('hide');
   })
   .catch(res => {
       alert("An error happend");
@@ -144,24 +167,24 @@ function renderToScreen(res){
 
 
   });
+
+    // Shows modal menu for users settings
+    $(".usersettings").on('click', (e) => {
+        $("#edit").modal('show');
+        let username = $(e.target).closest("tr").data('username');
+        $("#edituser").val(username);
+    })
+
+    // Handles the user delete event
+    $(".deleter").on('click', (e) => {
+        let username = $(e.target).closest("tr").data('username');
+
+        delUser({username: username})
+            .then(res => {
+                getDBUsers().then(d => renderToScreen(d));
+            })
+            .catch(err => {
+                alert("Coudln't delete the user")
+            })
+    })
 }
-
-// Shows modal menu for users settings
-$(".usersettings").on('click', (e) => {
-    $("#edit").modal('show');
-    let username = $(e.target).closest("tr").data('username');
-    $("#edituser").val(username);
-})
-
-// Handles the user delete event
-$(".deleter").on('click', (e) => {
-    let username = $(e.target).closest("tr").data('username');
-
-    delUser({username: username})
-        .then(res => {
-            getDBUsers().then(d => renderToScreen(d));
-        })
-        .catch(err => {
-            alert("Coudln't delete the user")
-        })
-})

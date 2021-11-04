@@ -3,14 +3,19 @@ from passlib.hash import pbkdf2_sha256
 import os
 import sys
 
-username = os.environ['AUTH_USERNAME']
-password = os.environ['AUTH_USERPASS']
+USERNAME = os.environ['AUTH_USERNAME']
+PASSWORD = os.environ['AUTH_USERPASS']
+DB = '/app/appdb.db'
 
-conn = sqlite3.connect('/app/appdb.db')
+conn = sqlite3.connect(DB)
 c = conn.cursor()
 
-c.execute('INSERT INTO user(name, password, is_admin) VALUES (?,?,1)', (username, pbkdf2_sha256.hash(password)))
-conn.commit()
-conn.close()
+try:
+    c.execute('INSERT INTO user(name, password, is_admin) VALUES (?,?,1)', (USERNAME, pbkdf2_sha256.hash(PASSWORD)))
+    conn.commit()
+except Exception as e:
+    conn.rollback()
+finally:
+    conn.close()
 
 sys.exit(0)
