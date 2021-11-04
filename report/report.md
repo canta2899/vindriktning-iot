@@ -816,11 +816,23 @@ L'endpoint `/api/me` di AirPI permette, infine, ad utenti amministratori e non d
 
 ## Installazione di un server WSGI
 
-Nonostante Flask permetta l'esecuzione di un server di sviluppo tramite l'utility `flask run`, è stato scelto di eseguire AirPI per mezzo di un server di produzione di tipo WSGI al fine di garantire maggiore efficienza, stabilità e sicurezza da parte dell'applicativo. È stata, quindi, impiegata la libreria **Waitress** che, una volta installata tramite `pip`, permette l'esecuzione di un'app Flask tramite il comando: 
+### Waitress
 
-```bash
-waitress-serve app:app
-```
+Nonostante Flask permetta l'esecuzione di un server di sviluppo tramite l'utility `flask run`, è stato scelto di eseguire AirPI per mezzo di un server di produzione di tipo WSGI al fine di garantire maggiore efficienza, stabilità e sicurezza da parte dell'applicativo. È stata, quindi, impiegata la libreria **Waitress** che, una volta installata tramite `pip`, permette l'esecuzione di un'app Flask sfruttando la chiamata alla funzione `serve()` in sostituzione ad `app.run()` (che lancia il server di sviluppo).
+
+### Definizione di un servizio di Reverse Proxy
+
+Constatata l'incompatibilità di Waitress con il protocollo `HTTPs`, al fine di garantire una connessione sicura è stato definito un servizio di **reverse proxy** tramite un web server **nginx** dedicato.
+
+In particolare, l'obiettivo di quest'ultimo è quello di redirezionare le richieste al web server WSGI di AirPI e trasmettere le risposte ottenute tramite una connessione sicura con l'utente finale. La configurazione del reverse proxy prevede, inoltre, la redirezione di richieste `HTTP` ad `HTTPs`.
+
+I certificati necessari all'apertura di una connessione sicura possono essere generati:
+
+- Manualmente, tramite **OpenSSL** (ciò comporta la presenza di avvertenze specifiche all'interno dei principali browser)
+- Sfruttando il servizio gratuito **Let's Encrypt** (che permette la generazione tramite il tool **Certbot**)
+- Appoggiandosi ad altri servizi (gratuiti o a pagamento) in grado di fornire certificati firmati da Certification Autorities note 
+
+Al fine di semplificare le attività di testing, lo script shell `nginx/gen-certs` permette, tramite OpenSSL, la generazione dei certificati necessari all'interno della directory `nginx/certificates/`.
 
 ## Variabili d'ambiente utilizzate
 
@@ -838,7 +850,7 @@ Al fine di una corretta esecuzione, l'applicativo prevede la presenza delle segu
 
 \newpage
 
-## Containerizzazione del servizio
+## Containerizzazione di AirPI 
 
 Come per i servizi precedentemente descritti, anche per AirPI è stata adottata una strategia basata sull'utilizzo di Docker al fine di racchiudere il servizio all'interno di un apposito container. A tal fine, a partire dall'immagine ufficiale **Alpine** è stato prodotto il Dockerfile riportato di seguito.
 
@@ -846,14 +858,16 @@ Come per i servizi precedentemente descritti, anche per AirPI è stata adottata 
 |
 
 ```Dockerfile
-
 FROM alpine
 
+RUN apk -U upgrade
 RUN apk add --update --no-cache build-base
+RUN apk add --update --no-cache libffi-dev openssl-dev
 RUN apk add --update --no-cache sqlite
 RUN apk add --update --no-cache python3 && ln -sf python3 /usr/bin/python
 RUN python3 -m ensurepip
 RUN apk add py3-sqlalchemy
+RUN apk add py-openssl
 RUN pip3 install --no-cache --upgrade pip setuptools
 RUN pip3 install --no-cache --upgrade flask
 RUN pip3 install --no-cache --upgrade influxdb
@@ -861,25 +875,24 @@ RUN pip3 install --no-cache --upgrade flask_sqlalchemy
 RUN pip3 install --no-cache --upgrade flask_jwt_extended
 RUN pip3 install --no-cache --upgrade passlib
 RUN pip3 install --no-cache --upgrade waitress
-RUN pip3 install --no-cache --upgrade pyopenssl
 
 RUN mkdir /app
 RUN mkdir /log
-RUN mkdir /certificates
 
 WORKDIR /app
 
 COPY ./app /app
 COPY ./entrypoint.sh /entrypoint.sh
 
-# RUN export FLASK_APP=app.py
-# RUN export FLASK_ENV=development
-
 ENTRYPOINT ["sh", "/entrypoint.sh"]
 
+# Development server commands
+# RUN export FLASK_APP=app.py
+# RUN export FLASK_ENV=development
 # CMD ["flask", "run", "--host=0.0.0.0", "--port=8080"]
-CMD ["waitress-serve", "app:app"]
 
+# Production server
+CMD ["python3", "app.py"]
 ```
 
 |
@@ -926,6 +939,78 @@ finally:
 sys.exit(0)
 ```
 
+|
+|
+
+## Containerizzazione di nginx
+
+Il servizio di reverse proxying precedentemente descritto è stato containerizzato come servizio indipendente. A tal fine, l'immagine è stata configurata, a partire da `nginx:mainline-alpine`, tramite il Dockerfile riportato di seguito. 
+
+|
+|
+
+```dockerfile
+FROM nginx:mainline-alpine
+
+RUN rm /etc/nginx/conf.d/default.conf
+COPY default.conf /etc/nginx/conf.d
+RUN mkdir /certificates
+COPY ./certificates /certificates
+```
+
+|
+|
+
+Quest'ultimo permette: 
+
+- L'inclusione di un file di configurazione ad-hoc (con annessa rimozione della configurazione di default)
+- L'inclusione dei certificati SSL necessari 
+
+In particolare, il file di configurazione (riportato di seguito) prevede l'istituzione di un web-server in ascolto sulle porte 80 e 443 (via ssl) che:
+
+- Carica i certificati SSL
+- Redirige le richieste al rispettivo endpoint del server WSGI di AirPI
+- Assicura che le richieste `HTTP` siano redirette ad `HTTPs`
+
+```conf
+
+server {
+    listen 443 ssl;
+
+
+    ssl_certificate /certificates/cert.pem;
+    ssl_certificate_key /certificates/key.pem;
+
+	# Change with your hostname
+	server_name localhost;
+
+
+ location / {
+
+           proxy_pass http://airpi:8080/;
+		   proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+		   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+		   # Define the maximum file size on file uploads
+		   client_max_body_size 5M;
+       }
+
+
+}
+
+server {
+    listen 80;
+
+	# Change with your hostname
+    server_name localhost;
+
+    return 302 https://$server_name$request_uri;
+}
+
+
+```
+
 \newpage
 
 # Deployment
@@ -936,8 +1021,10 @@ Il dispiegamento dei servizi descritti è reso possibile dallo strumento `docker
 
 In particolare, le due principali soluzioni di deployment risultano: 
 
-1. L'organizzazione di un singolo stack multi-container (ideale per un utilizzo all'interno di una rete domestica)
-2. L'organizzazione di due stack multi-container, al fine di rafforzare l'indipendenza fra i servizi di MQTT Brokering ed Engine e quelli di Database ed AirPI (ideale al fine di poter dispiegare il database InfluxDB ed AirPI nel cloud)
+1. L'organizzazione di un unico stack multi-container (ideale per un utilizzo interno ad una rete domestica)
+2. L'organizzazione di due stack multi-container, al fine di rafforzare l'indipendenza fra i servizi di MQTT Brokering ed Engine e quelli di Database ed AirPI (rendendo così possibile il dispiegamento di InfluxDB, AirPI e Reverse Proxy nel cloud)
+
+Va tenuto presente come, nel caso dell'adozione della seconda opzione, si renda necessaria la modifica dei riferimenti agli endpoint di AirPI sostituendo l'indirizzo `https://proxy/` (rappresentante il container nginx) con l'indirizzo ip o il dominio della macchina responsabile dell'hosting del servizio. 
 
 ## Aspetti di docker-compose coinvolti
 
@@ -982,7 +1069,18 @@ services:
       - AUTH_APPPASS=${AUTH_APPPASS}
     depends_on:
       - "broker"
+      - "proxy"
+    restart: always
+
+  proxy:
+    build:
+      context: ./nginx
+    container_name: proxy
+    depends_on:
       - "airpi"
+    ports:
+      - "443:443"
+      - "80:80"
     restart: always
 
   airpi:
@@ -997,8 +1095,8 @@ services:
       - AUTH_APPPASS=${AUTH_APPPASS}
       - AUTH_USERNAME=${AUTH_USERNAME}
       - AUTH_USERPASS=${AUTH_USERPASS}
-    ports:
-      - "8000:8080"
+	volumes:
+	  - api:/app
     depends_on:
       - "database"
     restart: always
@@ -1025,23 +1123,50 @@ services:
       - INFLUXDB_ADMIN_PASSWORD=${INFLUXDB_ADMIN_PASSWORD}
     volumes:
       - db:/var/lib/influxdb
+    ports:
+      - "8086:8086"
     restart: always 
-    
-volumes:
-  grafana:
-  db:
 
+volumes:
+  db:
+  api:
 ```
 
-\newpage
+Si osserva come il servizio `airpi` non includa alcun port mapping. L'accesso agli endpoint è permesso, infatti, solamente dal reverse proxy, che espone le porte `80` e `443` per connessioni rispettivamente `HTTP` ed `HTTPs`.
 
 ## Deployment su Raspberry PI
 
-testo
+Al fine di dispiegare la soluzione proposta su una piattaforma low-cost in grado di esporre continuativamente nell'arco delle giornata i servizi implementati, è stato scelto di eseguire il sistema sfruttando una **Raspberry Pi 4B**. 
+
+In particolare, in sostituzione a **Raspbian** è stato installato il sistema operativo **Ubuntu Server**, nella versione con architettura **ARM64**. In seguito all'installazione è stato necessario: 
+
+1. Eseguire i processi di **update** e **upgrade** rispettivamente tramite i comandi `sudo apt update` e `sudo apt upgrade`
+2. Installare `git` tramite il comando `sudo apt install git`
+3. Installare docker tramite lo script di convenienza `get-docker.sh`
+4. Eseguire il clone della respository tramite il comando `git clone https://github.com/canta2899/vindriktning-iot`
+5. Effettuare il build delle immagini Docker tramite l'utility `docker-compose build`
+6. Avviare i servizi tramite l'utility `docker-compose up`
+
+Al fine di agevolare la connessione delle unità VINDRIKTNING, alla Raspberry è stato, infine, assegnato un indirizzo ip statico tramite l'applicazione di un'apposita eccezione all'interno del **DHCP** del router locale. 
+
+L'esposizione del servizio **Monitoring Tool** all'esterno della rete locale è reso possibile tramite l'applicazione di un'opportuna configurazione di **port forwarding** nel router locale, con eventuale aggiunta di un DNS **statico** (nel caso in cui l'utilizzo sia reso possibile dal proprio provider) o, in alternativa, **dinamico** tramite servizi quali **DynDNS**, **NoIP** e altri.
+
+Si tiene presente, inoltre, il costo dell'hardware, disponibile online in varie soluzioni a partire da un prezzo di 35€ circa. Integrando, quindi, la tabella dei costi descritta in precedenza si ottiene il seguente risultato:
+
+| Componente | Costo Individuale | Quantità acquistate |
+|------------|------------------:|--------------------:|
+| VINDRIKTNING |  9,95 €         |     2               |
+| D1 Mini    |    4,00 €         |     2               |
+| Cavi Dupont|    3,00 €         |     1               |
+| Raspberry Pi 4 | 40,00 €		 |     1			   |
+
+Di conseguenza, il costo coinvolto nella personalizzazione di una singola unità VINDRIKTNING e nell'acquisto di hardware dedicato per dispiegare i servizi implementati raggiunge la cifra di **56,95 €**. Tuttavia, la personalizzazione di due unità richiede una spesa complessiva pari a **87,85 €**. Infine, l'utilizzo di modelli più economici di Raspberry Pi e similari permette un notevole abbattimento dei costi.
 
 \newpage
 
 ## Rappresentazione grafica dell'architettura finale
+
+In conclusione, la seguente rappresentazione grafica descrive la soluzione architetturata, specificando i servizi coinvolti.
 
 \begin{figure}[H]
 \centering
@@ -1069,6 +1194,123 @@ testo
 % Gli utenti non amministratori possono accedere solamente alla pagina dei grafici
 % L'amministratore abilita un utente telegram alla comunicazione con il bot, ma è l'utente a "bindarsi" al fine di abilitare la ricezione di notifiche. Questo permette una sicurezza da ambo i lati per evitare che utenti estranei possano parlare con il bot e per evitare che il bot possa inviare messaggi ad utenti che non li desiderano
 ```
+
+\newpage
+
+# Conclusioni
+
+## Guida alla installazione e configurazione del sistema
+
+Al fine di replicare l'integrazione presentata, è sufficiente seguire i passaggi di seguito elencati: 
+
+1. Eseguire il flash del firmware su tutti i dispositivi ESP8266 interessati
+2. Installare i dispositivi ESP8266 all'interno delle unità VINDRIKTNING
+3. Alimentare i sensori tramite cavo USB di tipo C
+
+Successivamente, è possibile:
+
+1. Connettersi ad ogni unità VINDRIKTNING (esposta come Soft Access Point e osservabile fra le reti disponibili)
+2. Specificare tramite l'apposito menu di configurazione:
+	- La rete Wi-Fi a cui connettersi
+	- La password della rete
+	- L'indirizzo IP del Broker MQTT utilizzato da Engine
+	- Il nome utente e la password necessari alla connessione al Broker MQTT
+	- Il nome proprio del sensore (si consiglia di assegnare ad ogni unità il nome della stanza in cui esse si trovano)
+
+All'interno della macchina adibita al dispiegamento dei servizi necessari diviene, quindi, possibile:
+
+1. L'ottenimento del software tramite il comando `git clone https://github.com/canta2899/vindriktning-iot.git`
+2. La generazione e/o l'inserimento dei certificati per HTTPS all'interno della cartella `nginx/certificates` (da creare, se necessario)
+3. La creazione di un file `.env` contenente i valori associati alle seguenti variabili: 
+	- `MOSQUITTO_USERNAME` (nome utente del Broker MQTT)
+	- `MOSQUITTO_PASSWORD` (password del Broker MQTT)
+	- `INFLUXDB_ADMIN_USER` (nome dell'utente amministratore del database InfluxDB)
+	- `INFLUXDB_ADMIN_PASSWORD` (password dell'utente amministratore del database InfluxDB)
+	- `INFLUXDB_API_USER` (nome dell'utente "api" del database InfluxDB)
+	- `INFLUXDB_API_PASSWORD` (password dell'utente "api" del database InfluxDB)
+	- `TELEGRAM_BOT_TOKEN` (token ottenuto da BotFather in seguito alla creazione del bot Telegram)
+	- `SENSOR_STATUS_ENDPOINT` (endpoint di AirPI per comunicazioni relative a variazioni di stato dei sensori)
+	- `DATA_ENDPOINT` (endpoint di AirPI per comunicazioni relative a una nuova rilevazione da parte di un sensore)
+	- `NOTIFICATION_ENDPOINT` (endpoint di AirPI per segnalazione e trasmissione di notifiche da inviare agli utenti interessati)
+	- `AUTH_ENDPOINT` (endpoint di riferimento per il servizio di autenticazione di AirPI)
+	- `AUTH_APPNAME` (nome dell'applicativo Engine riconosciuto da AirPI)
+	- `AUTH_APPPASS` (secret dell'applicativo Engine riconosciuto da AirPI)
+	- `AUTH_USERNAME` (nome dell'utente creato al primo avvio del sistema al fine di poter accedere a Monitoring Tool)
+	- `AUTH_USERPASS` (password dell'utente creato al primo avvio del sistema al fine di poter accedere a Monitoring Tool)
+4. L'eventuale modifica del volume mapping definito in `docker-compose.yaml` in base alle proprie preferenze
+
+Infine, i servizi possono essere eseguiti tramite l'utility
+
+```bash
+docker-compose up
+```
+
+oppure
+
+```bash
+docker-compose up -d 
+```
+
+specificando, così, l'avvio in modalità detached al fine di non ottenere in risposta il **log interattivo** fornito da docker-compose.
+
+Lo spegnimento del sistema è permesso, invece, dal comando
+
+```bash
+docker-compose stop
+```
+
+## Follow ups
+
+Nel corso dello svolgimento dell'attività progettuale sono stati, inoltre, individuati aspetti che permettono un ulteriore raffinamento della soluzione proposta, espandendone le funzionalità. In particolare, sono state individuate le seguenti variazioni e funzionalità:
+
+- Implementazione di un applicativo mobile in sostituzione al Bot Telegram al fine di fornire uno strumento ad-hoc per permettere l'interazione con l'utenza
+- Implementazione di appositi moduli integrativi al fine di permettere l'interazione fra VINDRKTNING ed altri accessori domotici fra cui, ad esempio, il purificatore d'aria **FÖRNUFTIG** di Ikea (che consiglia l'abbinamento pur non offrendo una soluzione in grado di interconnettere i due prodotti), la cui accensione può essere automatizzata tramite prese a muro intelligenti.
+- L'espansione di AirPI al fine di permettere:
+	- Una più variagata gestione delle utente e dei permessi associati
+	- La possibilità di configurare più di un applicativo Engine distinto
+	- La possibilità di collegare più applicativi Engine ad utenze diverse mantenendo separati i rispettivi flussi di dati 
+
+## Resoconto finale
+
+La realizzazione del progetto esposto individua una specifica attivtà di modifica del prodotto ufficialmente presentato da IKEA proponendo, attraverso l’integrazione di un firmware ad-hoc e l’implementazione delle componenti software necessarie, uno "**Smart Tool**" in grado di rendere altamente fruibili i dati relativi alla qualità dell'aria raccolti da uno o più sensori.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
