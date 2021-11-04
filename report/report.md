@@ -79,7 +79,7 @@ In seguito all'acquisto di due unità VINDRIKTNING e ad un breve periodo di util
 
 ## Definizione dei principali servizi
 
-Al fine di poter attuare gli obiettivi preposti, sono stati delineati i principali servizi necessari all'implementazione di un sistema di supporto ad un **flusso di dati** generato da **più sensori** connessi alla stessa **rete locale**. Si rende, di conseguenza, necessario lo sviluppo di:
+Al fine di poter attuare gli obiettivi preposti, sono stati delineati i principali servizi necessari all'implementazione di un sistema di supporto ad un **flusso di dati** generato da **più sensori** connessi allo stesso dispositivo. Si rende, di conseguenza, necessario lo sviluppo di:
 
 - Un **firmware personalizzato** in grado di permettere ai sensori di comunicare via rete le rilevazioni effettuate
 - Un servizio per la **ricezione centralizzata dei dati**
@@ -438,7 +438,7 @@ exec "$@"
 Il codice sorgente dell'applicativo è consultabile al path `engine/engine.py` della repository.
 
 
-## Ricezione dei dati 
+## Comunicazione con VINDRIKTNING 
 
 La ricezione dei dati tramessi dalle unità VINDRIKTNING al Broker MQTT sui topic d'interesse richiede l'autenticazione di Engine. A tal fine, il container prevede la definizione delle variabili d'ambiente `MOSQUITTO_USERNAME` e `MOSQUITTO_PASSWORD` in riferimento, rispettivamente, al nome utente e alla password previsti da Eclipse Mosquitto a seguito della configurazione sopradescritta.
 
@@ -834,8 +834,9 @@ Al fine di una corretta esecuzione, l'applicativo prevede la presenza delle segu
 | `INFLUXDB_API_USER` | Nome utente per connessione ad InfluxDB tramite InfluxDBClient |
 | `INFLUXDB_API_PASSWORD` | Password per connessione ad InfluxDB tramite InfluxDBClient |
 | `AUTH_USERNAME` | Nome utente del primo utente amministratore, creato automaticamente per Monitoring Tool |
-| `AUTH_USERPASS` | Nome utente del primo profile amministratore, creato appositamente per accedere a Monitoring Tool |
 | `AUTH_USERPASS` | Password del primo utente amministratore, creato appositamente per accedere a Monitoring Tool |
+
+\newpage
 
 ## Containerizzazione del servizio
 
@@ -860,9 +861,11 @@ RUN pip3 install --no-cache --upgrade flask_sqlalchemy
 RUN pip3 install --no-cache --upgrade flask_jwt_extended
 RUN pip3 install --no-cache --upgrade passlib
 RUN pip3 install --no-cache --upgrade waitress
+RUN pip3 install --no-cache --upgrade pyopenssl
 
 RUN mkdir /app
 RUN mkdir /log
+RUN mkdir /certificates
 
 WORKDIR /app
 
@@ -895,24 +898,30 @@ Quest'ultimo, in particolare, prevede:
 Le linee commentate permettono, se opportunamente sostituite al comando finale, l'esecuzione di AirPI per mezzo del server di sviluppo integrato in Flask. Il comando di entrypoint prevede, invece, l'esecuzione del codice contenuto in `/app/first_user.py` prima dell'avvio dell'applicativo. In particolare, lo script Python (il cui codice è di seguito riportato) prevede, sulla base delle sopracitate variabili d'ambiente `AUTH_USERNAME` e `AUTH_USERPASS`, la configurazione del primo utente amministratore di AirPI.
 
 ```python
+
 import sqlite3
 from passlib.hash import pbkdf2_sha256
 import os
 import sys
 
-username = os.environ['AUTH_USERNAME']
-password = os.environ['AUTH_USERPASS']
+USERNAME = os.environ['AUTH_USERNAME']
+PASSWORD = os.environ['AUTH_USERPASS']
+DB = '/app/appdb.db'
 
-conn = sqlite3.connect('/app/appdb.db')
+conn = sqlite3.connect(DB)
 c = conn.cursor()
 
-c.execute(
-	'INSERT INTO user(name, password, is_admin) ' 
-	'VALUES (?,?,1), (username, pbkdf2_sha256.hash(password))'
-)
-
-conn.commit()
-conn.close()
+try:
+    c.execute(
+		'INSERT INTO user(name, password, is_admin) 
+		VALUES (?,?,1)', 
+		(USERNAME, pbkdf2_sha256.hash(PASSWORD))
+	)
+    conn.commit()
+except Exception as e:
+    conn.rollback()
+finally:
+    conn.close()
 
 sys.exit(0)
 ```
@@ -920,6 +929,8 @@ sys.exit(0)
 \newpage
 
 # Deployment
+
+## Soluzione adottata per il dispiegamento dei servizi 
 
 Il dispiegamento dei servizi descritti è reso possibile dallo strumento `docker-compose`, che permette la definizione e organizzazione di applicativi multi-container tramite l'apposito file `docker-compose.yaml` consultabile alla root directory della repository. 
 
@@ -944,20 +955,15 @@ Al fine di agevolare l'eventuale modifica delle variabili d'ambiente necessarie,
 
 La specifica delle variabili d'ambiente in `docker-compose.yaml` avviene, pertanto, mediante la sintassi
 
-|
-|
-
 ```bash
 - VARIABLE_NAME = ${VARIABLE_NAME_ENVFILE}
 ```
-|
-|
 
 Dove `VARIABLE_NAME` riferisce il nome assunto dalla variabile all'interno del container e `VARIABLE_NAME_ENVFILE` riferisce il nome della variabile della quale acquisire il valore specificato all'interno del file `.env`. Nello specifico, al fine di evitare ambiguità, è stato scelto di mantenere identico il nome di ogni variabile rispetto al corrispondente riferimento all'interno del file.
 
 Il risultato finale viene riportato di seguito:
 
-```dockerfile
+```docker-compose
 
 version: "3"
 services:
@@ -1021,14 +1027,6 @@ services:
       - db:/var/lib/influxdb
     restart: always 
     
-  charts:
-    image: grafana/grafana
-    container_name: charts
-    volumes:
-      - grafana:/var/lib/grafana
-    ports:
-      - "3000:3000"
-
 volumes:
   grafana:
   db:
@@ -1037,22 +1035,35 @@ volumes:
 
 \newpage
 
-# Guida all'utilizzo per l'utente
+## Deployment su Raspberry PI
 
-Nel seguente paragrafo saranno riportati i passi che l’utente deve compiere per utilizzare al meglio il prodotto.
-Attivare il dispositivo dando inizio alla configurazione. Una volta acceso questo si troverà in modalità SoftAccessPoint momento in cui l’utente si può connettere direttamente al dispositivo e, una volta effettuato l’accesso alla rete wifi desiderata, specificare all’interno dei campi dedicati alcune informazioni necessarie riportate nell’elenco sottostante: 
-- L’indirizzo IP del Broker MQTT
-- La porta del Broker MQTT
-- Il nome utente e la password per inviare messaggi al Broker
-- Un nome da assegnare allo specifico sensore (si consiglia di sceglierlo in base alla stanza in cui si decide di posizionarlo)
+testo
 
-Successivamente posizionare il sensore nel luogo in cui si necessita.
+\newpage
 
-Se si vogliono sfruttare le funzionalità offerte in più rispetto al semplice prodotto IKEA, seguire attentamente le istruzioni riportate in seguito.
-Accedere al monitoring tool con le credenziali fornite in modo da poter osservare i dati raccolti dai sensori installati nel periodo di tempo pari all’ultima settimana. Il livello di autorizzazione definito in questo caso sarà di amministratore; ciò consente di nominare altri utenti aggiungendoli all’elenco nella sezione Telgram della navigation bar mediante il loro username.
-Il passo finale consiste nell’inizializzare il bot su Telegram ed effettuare il binding. Questo permetterà all’utente di ricevere aggiornamenti e interagire con questo, in modo tale da ricevere via messaggio le segnalazioni di superamento dei limiti per i tre diversi livelli di qualità dell’aria rilevata dai sensori. In caso di necessità l’utente può anche rivolgersi al bot chiedendo, attraverso il comando /info nomeSensore, informazioni relative al sensore in questione come l’ultimo valore registrato di qualità e misurazione PM2.5.
+## Rappresentazione grafica dell'architettura finale
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=550px]{img/architettura3.png}
+\end{figure}
 
 ```{=latex}
+% # Guida all'utilizzo per l'utente
+% 
+% Nel seguente paragrafo saranno riportati i passi che l’utente deve compiere per utilizzare al meglio il prodotto.
+% Attivare il dispositivo dando inizio alla configurazione. Una volta acceso questo si troverà in modalità SoftAccessPoint momento in cui l’utente si può connettere direttamente al dispositivo e, una volta effettuato l’accesso alla rete wifi desiderata, specificare all’interno dei campi dedicati alcune informazioni necessarie riportate nell’elenco sottostante: 
+% - L’indirizzo IP del Broker MQTT
+% - La porta del Broker MQTT
+% - Il nome utente e la password per inviare messaggi al Broker
+% - Un nome da assegnare allo specifico sensore (si consiglia di sceglierlo in base alla stanza in cui si decide di posizionarlo)
+% 
+% Successivamente posizionare il sensore nel luogo in cui si necessita.
+% 
+% Se si vogliono sfruttare le funzionalità offerte in più rispetto al semplice prodotto IKEA, seguire attentamente le istruzioni riportate in seguito.
+% Accedere al monitoring tool con le credenziali fornite in modo da poter osservare i dati raccolti dai sensori installati nel periodo di tempo pari all’ultima settimana. Il livello di autorizzazione definito in questo caso sarà di amministratore; ciò consente di nominare altri utenti aggiungendoli all’elenco nella sezione Telgram della navigation bar mediante il loro username.
+% Il passo finale consiste nell’inizializzare il bot su Telegram ed effettuare il binding. Questo permetterà all’utente di ricevere aggiornamenti e interagire con questo, in modo tale da ricevere via messaggio le segnalazioni di superamento dei limiti per i tre diversi livelli di qualità dell’aria rilevata dai sensori. In caso di necessità l’utente può anche rivolgersi al bot chiedendo, attraverso il comando /info nomeSensore, informazioni relative al sensore in questione come l’ultimo valore registrato di qualità e misurazione PM2.5.
+% 
 % Primo utente amministratore creato quando viene istanziato il container sulla base delle variabili ambientali definite
 % Gli utenti amministratori possono aggiungere utenti telegram e aggiungere utenti per il monitoring tool
 % Gli utenti non amministratori possono accedere solamente alla pagina dei grafici
