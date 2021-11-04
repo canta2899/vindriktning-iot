@@ -113,7 +113,7 @@ Una volta aperto il contenitore di VINDRIKTNING svitando le quattro viti che lo 
 
 Si osserva, inoltre, come la breakout board del microcontrollore presenti svariati pin inutilizzati, fra cui: 
 
-- `+5V` e `GND` (passthru per l'alimentazione ricevuta tramite cavo USB)
+- `+5V` e `GND` (passthrough per l'alimentazione ricevuta tramite cavo USB)
 - `ISPDA` e `ISPCLK` (che forniscono una connessione ai pin SCL e SDA per la comunicazione tramite protocollo I2C)
 - `REST` (che fornisce un test point per il pin seriale `RX`)
 - `LED_G_1` e `LED_R_1` (che forniscono un punto d'accesso per la comunicazine con led appositi)
@@ -253,7 +253,7 @@ In modalità SoftAccessPoint, è possibile connettersi direttamente al microcont
 - Il nome utente e la password per inviare messaggi al Broker
 - Un nome da assegnare allo specifico sensore (ad esempio, *Cucina*)
 
-La schermata di configurazione visualizzato da uno smartphone è la seguente:
+La schermata di configurazione visualizzata da uno smartphone è la seguente:
 
 \begin{figure}[H]
 \centering
@@ -285,7 +285,7 @@ Il codice sorgente del firmware implementato risulta accessibile all'interno del
 
 # Definizione del Broker MQTT
 
-Al fine di poter comunicare i dati sulla rete, VINDRIKTNING necessita di un indirizzo valido che identifichi un **Broker MQTT** adibito alla ricezione all'eventuale ritenzione dei messaggi. A tal fine, è stata scelta l'adozione del software open source **Eclipse Mosquitto**.
+Al fine di poter comunicare i dati sulla rete, VINDRIKTNING necessita di un indirizzo valido che identifichi un **Broker MQTT** adibito alla ricezione e all'eventuale ritenzione dei messaggi. A tal fine, è stata scelta l'adozione del software open source **Eclipse Mosquitto**.
 
 ## Containerizzazione di Eclipse Mosquitto
 
@@ -371,7 +371,7 @@ exec "$@"
 |
 |
 
-Una volta eseguito, il servizio risulterà accessibile alla porta 1883 del container.
+Una volta eseguito, il servizio risulta accessibile alla porta 1883 del container.
 
 \newpage
 
@@ -712,7 +712,7 @@ L'implementazione di AirPI è contenuta all'interno del percorso file `airpi/app
 
 Come riportato in precedenza, al fine di fornire uno strumento rivolto alla fruizione dei dati raccolti dai sensori e all'amministrazione delle utenze del sistema è stato definito un applicativo web-based denominato **Monitoring Tool**.
 
-L'implementazione dell'app si appoggia alla libreria di templating HTML **Jinja2** integrata in Flask, che permette di inviare al richiedente pagine HTML appositamente formattate. Queste ultime sfruttano, a loro volta, richieste **fetch** (implementate lato client utilizzando il linguaggio JavaScript) per interrogare gli endpoint di AirPI rivolti all'ottenimento delle informazioni necessarie. Al fine di ottenere un layout responsive è stato utilizzato il framework **Bootstrap 4**, al quale sono state apportate minime integrazioni all'interno di un apposito file di stile.
+L'implementazione dell'app si appoggia alla libreria di templating HTML **Jinja2** integrata in Flask, che permette di inviare al richiedente pagine HTML appositamente formattate. Queste ultime sfruttano, a loro volta, richieste **fetch** (implementate lato client utilizzando il linguaggio JavaScript) per interrogare gli endpoint di AirPI rivolti all'ottenimento delle informazioni necessarie. Al fine di ottenere un layout responsive è stato utilizzato il framework **Bootstrap 4**, al quale sono state apportate minime integrazioni all'interno di un apposito foglio di stile.
 
 Le funzionalità implementate, in particolare, prevedono: 
 
@@ -1138,7 +1138,7 @@ Si osserva come il servizio `airpi` non includa alcun port mapping. L'accesso ag
 
 Al fine di dispiegare la soluzione proposta su una piattaforma low-cost in grado di esporre continuativamente nell'arco delle giornata i servizi implementati, è stato scelto di eseguire il sistema sfruttando una **Raspberry Pi 4B**. 
 
-In particolare, in sostituzione a **Raspbian** è stato installato il sistema operativo **Ubuntu Server**, nella versione con architettura **ARM64**. In seguito all'installazione è stato necessario: 
+In particolare, in sostituzione a **Raspbian** è stato installato il sistema operativo **Ubuntu Server 21.04**, nella versione con architettura **ARM64**. In seguito all'installazione è stato necessario: 
 
 1. Eseguire i processi di **update** e **upgrade** rispettivamente tramite i comandi `sudo apt update` e `sudo apt upgrade`
 2. Installare `git` tramite il comando `sudo apt install git`
@@ -1266,7 +1266,7 @@ Nel corso dello svolgimento dell'attività progettuale sono stati, inoltre, indi
 - Implementazione di un applicativo mobile in sostituzione al Bot Telegram al fine di fornire uno strumento ad-hoc per permettere l'interazione con l'utenza
 - Implementazione di appositi moduli integrativi al fine di permettere l'interazione fra VINDRKTNING ed altri accessori domotici fra cui, ad esempio, il purificatore d'aria **FÖRNUFTIG** di Ikea (che consiglia l'abbinamento pur non offrendo una soluzione in grado di interconnettere i due prodotti), la cui accensione può essere automatizzata tramite prese a muro intelligenti.
 - L'espansione di AirPI al fine di permettere:
-	- Una più variagata gestione delle utente e dei permessi associati
+	- Una più variagata gestione delle utenze e dei permessi associati
 	- La possibilità di configurare più di un applicativo Engine distinto
 	- La possibilità di collegare più applicativi Engine ad utenze diverse mantenendo separati i rispettivi flussi di dati 
 
