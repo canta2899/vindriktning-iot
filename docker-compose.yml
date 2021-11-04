@@ -15,7 +15,18 @@ services:
       - AUTH_APPPASS=${AUTH_APPPASS}
     depends_on:
       - "broker"
+      - "proxy"
+    restart: always
+
+  proxy:
+    build:
+      context: ./nginx
+    container_name: proxy
+    depends_on:
       - "airpi"
+    ports:
+      - "443:443"
+      - "80:80"
     restart: always
 
   airpi:
@@ -30,8 +41,6 @@ services:
       - AUTH_APPPASS=${AUTH_APPPASS}
       - AUTH_USERNAME=${AUTH_USERNAME}
       - AUTH_USERPASS=${AUTH_USERPASS}
-    ports:
-      - "8000:8080"
     depends_on:
       - "database"
     restart: always
@@ -61,16 +70,7 @@ services:
     ports:
       - "8086:8086"
     restart: always 
-    
-  charts:
-    image: grafana/grafana
-    container_name: charts
-    volumes:
-      - grafana:/var/lib/grafana
-    ports:
-      - "3000:3000"
 
 volumes:
-  grafana:
   db:
 
