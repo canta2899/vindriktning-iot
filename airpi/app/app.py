@@ -21,67 +21,74 @@ from flask_jwt_extended import (
     unset_jwt_cookies
 )
 
-from flask_jwt_extended.utils import get_current_user, get_jwt_header, set_access_cookies
-from werkzeug.utils import redirect
+# from flask_jwt_extended.utils import get_current_user, get_jwt_header, set_access_cookies
 
 from datetime import datetime, timedelta
-from influxdb import InfluxDBClient
 from flask_sqlalchemy import SQLAlchemy
 from passlib.hash import pbkdf2_sha256
+from influxdb import InfluxDBClient
+from waitress import serve
+from bot import Bot
 import json
 import os
-from waitress import serve
 
-from bot import Bot
 
-USE_WSGI = True
+# ------- Variables ------------
 
-APP_NAME = os.environ['AUTH_APPNAME']
-APP_SECRET = os.environ['AUTH_APPPASS']
+USE_WSGI = False
+RUN_BOT = False
+
+APP_NAME = os.environ.get('AUTH_APPNAME', 'prova')
+APP_SECRET = os.environ.get('AUTH_APPPASS', 'test')
 APP_ID = 'engineapp'
-
-# APP_NAME = 'prova'
-# APP_SECRET = 'test'
 
 TOKENS_FILE = '/tokens/tokens.json'
 INFLUX_DB_DATABASE = 'airquality'
 
-INFLUX_DB_USER = os.environ['INFLUXDB_API_USER'] 
-INFLUX_DB_PASSWORD = os.environ['INFLUXDB_API_PASSWORD']
-INFLUX_DB_HOST = 'database'         
+INFLUX_DB_USER = os.environ.get('INFLUXDB_API_USER', 'bridge')
+INFLUX_DB_PASSWORD = os.environ.get('INFLUXDB_API_PASSWORD', 'bridge')
+# INFLUX_DB_HOST = 'database'         
+INFLUX_DB_HOST = 'localhost'  
 INFLUX_DB_PORT = 8086
-TELEGRAM_BOT_TOKEN = os.environ['TELEGRAM_BOT_TOKEN'] 
-
-# INFLUX_DB_USER = 'bridge' 
-# INFLUX_DB_PASSWORD = 'bridge'
-# INFLUX_DB_HOST = 'localhost'         
-# INFLUX_DB_PORT = 8086
-# TELEGRAM_BOT_TOKEN = 'past-here-your-token'
+TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', 'paste-here-your-token')
 
 
+# -------- Queries -------------
+
+# InfluxDB Queries for charts
 LINE = 'select mean("pm25") from "airquality" where time > now() - 10d group by time(2m), "name" fill(none)'
 BAR = 'select mean("pm25") from "airquality" where time > now() - 10d group by "name"'
 
+
+# -------- App DB init ---------
+
 app = Flask(__name__)
 jwt = JWTManager(app)
+db = SQLAlchemy(app)
 
-app.config["JWT_COOKIE_SECURE"] = True  # true in production, false in development
+
+
+# -------- App Config ----------
+
+# App configuration
+app.config["JWT_COOKIE_SECURE"] = True 
 app.config["JWT_TOKEN_LOCATION"] = ["headers", "cookies"]
 app.config["JWT_SECRET_KEY"] = "secret"
 app.config['JWT_ACCESS_COOKIE_PATH'] = '/'
 app.config['JWT_REFRESH_COOKIE_PATH'] = '/'
-app.config['JWT_COOKIE_CSRF_PROTECT'] = True # true in production, false in development
+app.config['JWT_COOKIE_CSRF_PROTECT'] = True 
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=1)
 app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///appdb.db"
-# python3 -c 'import secrets; print(secrets.token_hex())'
 app.config['SECRET_KEY'] = '7fb209172a3227ceccd8cb27fbbfd50e00257ac4bf43f0b141fa2ebbc384a0b6'
+# python3 -c 'import secrets; print(secrets.token_hex())'  [to create a new secret key]
+
 
 sensor_list = dict()
 influxbot = None
+b = Bot(TELEGRAM_BOT_TOKEN)
 
-db = SQLAlchemy(app)
 
-# Defining database models
+# -------- DB Models -----------
 
 class User(db.Model):
     id = db.Column(db.Integer, db.Sequence('user_id_seq'), primary_key=True)
@@ -93,6 +100,8 @@ class TelegramUser(db.Model):
     username = db.Column(db.String(50), primary_key=True)
     chat_id = db.Column(db.Integer, nullable=True)
 
+
+# -------- Bot Callbacks --------
 
 def bind_callback(chat_id, username, params):
 
@@ -129,6 +138,7 @@ def status_callback(chat_id, _, params):
     """
 
     user = TelegramUser.query.filter_by(chat_id=chat_id).first() 
+    
     if not user:
         return
 
@@ -232,15 +242,7 @@ def start_callback(chat_id, _1, _2):
     )
 
 
-# Starts telegram bot definind callbacks endpoints
-
-b = Bot(TELEGRAM_BOT_TOKEN)
-b.on('/status', status_callback)
-b.on('/info', info_callback)
-b.on('/bind', bind_callback)
-b.on('/start', start_callback)
-b.run()
-
+# -------- Utilities -----------
 
 def get_influx():
 
@@ -299,22 +301,6 @@ def defaultconverter(o):
     if isinstance(o, datetime):
         return o.__str__()
 
-        
-# Allows to handle the automatic token refresh if desired
-
-# @app.after_request
-# def refresh_expiring_jwts(response):
-#     try:
-#         exp_timestamp = get_jwt()['exp']
-#         now = datetime.now()
-#         target_timestamp = datetime.timestamp(now + timedelta(minutes=30))
-#         if target_timestamp > exp_timestamp:
-#             access_token = create_access_token(identity=get_jwt_identity())
-#             # cookie
-
-#         return response
-#     except (RuntimeError, KeyError):
-#         return response
 
 def is_from_browser(user_agent):
     return user_agent.browser in [
@@ -334,19 +320,36 @@ def is_from_browser(user_agent):
         "seamonkey",
         "webkit",
     ] 
+        
+# Allows to handle the automatic token refresh if desired
+
+# @app.after_request
+# def refresh_expiring_jwts(response):
+#     try:
+#         exp_timestamp = get_jwt()['exp']
+#         now = datetime.now()
+#         target_timestamp = datetime.timestamp(now + timedelta(minutes=30))
+#         if target_timestamp > exp_timestamp:
+#             access_token = create_access_token(identity=get_jwt_identity())
+#             # cookie
+
+#         return response
+#     except (RuntimeError, KeyError):
+#         return response
+
  
 @app.errorhandler(403)
 def forbidden(e):
-    return render_template('403.html', logged=False, params={'admin': False}), 403
+    return render_template('403.html', logged=False, admin=False), 403
  
 @app.errorhandler(404)
 def page_not_found(e):
-    return render_template('404.html', logged=False, params={'admin': False}), 404
+    return render_template('404.html', logged=False, admin=False), 404
 
 @jwt.expired_token_loader
 def expired_token(jwt_header, jwt_payload):
     if is_from_browser(request.user_agent):
-        return render_template('login.html', logged=False, params={'admin': False})
+        return render_template('login.html', logged=False, admin=False)
     return jsonify({'msg': 'Not authorized', 'description': 'Token has expired'}), 401
 
 @app.route('/')
@@ -360,24 +363,20 @@ def entry_point():
 
     current_identity = get_jwt_identity()
     
-    params = {
-        'admin': False
-    }
-    
     if current_identity:
         user = User.query.filter_by(id=current_identity).first()
+
         if not user:
             return redirect('/logout')
-        if user.is_admin:
-            params['admin'] = True
-        return render_template('charts.html', logged=True, params=params)
+
+        return render_template('charts.html', logged=True, admin=user.is_admin)
     else:
-        return render_template('login.html', logged=False, params=params)
+        return render_template('login.html', logged=False, admin=False)
 
 
 @app.route('/api/data/line')
 @jwt_required()
-def data():
+def dataline():
 
     """
         Returns data in order to produce line chart if
@@ -388,8 +387,6 @@ def data():
 
     if not res:
         return {'status': 'data_unreachable'}, 500
-    
-    # get_ts = lambda x: datetime.strptime(x, '%Y-%m-%dT%H:%M:%S%z').timestamp()
     
     data = []
     
@@ -415,11 +412,14 @@ def databar():
     """ 
 
     res = get_influx().query(BAR)
+
     if not res:
         return {'status': 'data_unreachable'}, 500
+    
     chart_x = [v[1]['name'] for v in res.keys()] 
     chart_y = [v[0]['mean'] for v in res]
     chart_data = [{'name': name, 'median': median} for name, median in zip(chart_x, chart_y)]
+    
     return Response(
         json.dumps(chart_data),
         mimetype='application/json'
@@ -641,7 +641,7 @@ def telegram():
     if current_identity:
         user = User.query.filter_by(id=current_identity).first()
         if user.is_admin:
-            return render_template('telegram.html', logged=True, params={'admin': True})
+            return render_template('telegram.html', logged=True, admin=True)
     return redirect('/')
 
 
@@ -655,14 +655,11 @@ def users():
     """
 
     current_identity = get_jwt_identity()
-    params = {
-        'admin': False
-    }
+
     if current_identity:
         user = User.query.filter_by(id=current_identity).first()
         if user.is_admin:
-            params['admin'] = True
-            return render_template('users.html', logged=True, params=params)
+            return render_template('users.html', logged=True, admin=True)
     return redirect('/')
 
 @app.route("/me", methods=['GET'])
@@ -675,17 +672,11 @@ def me():
     
     current_identity = get_jwt_identity()
 
-    params = {
-        'admin': False
-    }
-    
     if current_identity:
         me = User.query.filter_by(id=current_identity).first()
-        params['username'] = me.name
-        params['admin'] = me.is_admin
-        return render_template('profile.html', logged=True, params=params)
+        return render_template('profile.html', logged=True, admin=me.is_admin, username=me.name)
     
-    return render_template('login.html', logged=False, params=params)
+    return render_template('login.html', logged=False, admin=False)
 
 
 @app.route("/api/me", methods=['PUT'])
@@ -781,7 +772,7 @@ def login():
     
     if current_identity:
         return redirect('/')
-    return render_template('login.html', admin=False, params={'admin': False})
+    return render_template('login.html', admin=False)
 
 
 @app.route('/logout', methods=['GET'])
@@ -858,6 +849,15 @@ def notify_bot():
 
 # Run the app
 if __name__ == "__main__":
+    
+    # Binds bot to callback
+    if RUN_BOT:
+        b.on('/status', status_callback)
+        b.on('/info', info_callback)
+        b.on('/bind', bind_callback)
+        b.on('/start', start_callback)
+        b.run()
+    
     if USE_WSGI:
         # Production server
         serve(app, host='0.0.0.0', port=8080, url_scheme='https')

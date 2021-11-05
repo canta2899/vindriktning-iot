@@ -30,12 +30,12 @@
           <li class="nav-item active">
             <a class="nav-link" href="/">Home <span class="sr-only">(current)</span></a>
           </li>
-          {% if logged and params['admin'] %}
+          {% if logged and admin %}
           <li class="nav-item">
             <a class="nav-link" href="/telegram">Telegram</a>
           </li>
           {% endif %}
-          {% if params['admin'] %}
+          {% if admin %}
           <li class="nav-item">
             <a class="nav-link" href="/users">Users</a>
           </li>
