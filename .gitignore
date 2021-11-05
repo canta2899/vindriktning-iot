@@ -1,12 +1,8 @@
 .DS_Store
 __pycache__
 engine/env
-notes.txt
 .vscode
 .env
 env/
 reset
-todos.txt
-timesyncscript.txt
-monitortool/app/run.sh
 nginx/certificates
