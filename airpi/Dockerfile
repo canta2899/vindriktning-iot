@@ -22,7 +22,4 @@ RUN mkdir /log
 WORKDIR /app
 
 COPY ./app /app
-COPY ./entrypoint.sh /entrypoint.sh
-
-ENTRYPOINT ["sh", "/entrypoint.sh"]
 

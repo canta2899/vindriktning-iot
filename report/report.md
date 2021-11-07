@@ -3,7 +3,7 @@ title: "Applicazione di integrazioni IoT ad uno strumento per il monitoraggio de
 author: |
         | Andrea Cantarutti (141808)
         | Lorenzo Bellina (142544)
-date: "20 ottobre 2021"
+date: "8 Novembre 2021"
 output:
 header-includes:
   - \usepackage{amsmath}
@@ -764,7 +764,7 @@ Al fine di una corretta esecuzione, l'applicativo prevede la presenza delle segu
 | `AUTH_USERNAME` | Nome utente del primo utente amministratore, creato automaticamente per Monitoring Tool |
 | `AUTH_USERPASS` | Password del primo utente amministratore, creato appositamente per accedere a Monitoring Tool |
 | `MOSQUITTO_USERNAME` | Nome utente necessario alla connessione con il servizio di MQTT Brokering |
-| `MOSQUITTO_PASSWORD` | Password necessaaria alla connessione con il servizio di MQTT Brokering |
+| `MOSQUITTO_PASSWORD` | Password necessaria alla connessione con il servizio di MQTT Brokering |
 
 \newpage
 
@@ -800,9 +800,7 @@ RUN mkdir /log
 WORKDIR /app
 
 COPY ./app /app
-COPY ./entrypoint.sh /entrypoint.sh
 
-ENTRYPOINT ["sh", "/entrypoint.sh"]
 ```
 
 |
