@@ -48,6 +48,8 @@ function renderLineChart(){
                         display: true 
                     },
                     ticks: {
+                        max: 200,
+                        min: 0,
                         beginAtZero: true,
                         fontSize: 13,
                         fontColor: 'whitesmoke'
@@ -112,6 +114,9 @@ function renderBarChart(){
                         display: true 
                     },
                     ticks: {
+                        max: 200,
+                        min: 0,
+                        beginAtZero: true,
                         fontSize: 13,
                         fontColor: 'whitesmoke'
                     }
