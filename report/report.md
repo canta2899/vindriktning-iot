@@ -943,6 +943,8 @@ services:
     build:
       context: ./proxy
     container_name: proxy
+    volumes:
+      - ./proxy/certificates:/certificates
     depends_on:
       - "airpi"
     ports:
@@ -996,7 +998,6 @@ services:
 
 volumes:
   db:
-
 
 ```
 

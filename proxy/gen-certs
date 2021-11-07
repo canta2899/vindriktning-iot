@@ -1,7 +1,65 @@
 #!/bin/bash
 
-mkdir -p ./certificates
+CERTS=./certificates
+CA_CRT=$CERTS/rootCA.crt
+CA_KEY=$CERTS/rootCA.key
+DOMAIN_KEY=$CERTS/domain.key
+DOMAIN_CSR=$CERTS/domain.csr
+DOMAIN_EXT=$CERTS/domain.ext
+DOMAIN_CRT=$CERTS/domain.crt
 
-rm ./certificates/*
+mkdir -p $CERTS
 
-openssl req -x509 -newkey rsa:4096 -keyout ./certificates/key.pem -out ./certificates/cert.pem -days 365 -nodes
+rm $CERTS/* > /dev/null 2>&1
+
+wait_user(){
+	echo -e "\n\n"
+	tput setaf 3; tput bold; echo "Press any button to continue"; tput sgr0;
+	read
+	echo -e "\n\n"
+}
+
+title(){
+	tput setaf 2; tput setb 7; tput bold; echo $1; tput sgr0;
+	echo -e "\n\n"
+}
+
+# openssl req -x509 -newkey rsa:4096 -keyout ./certificates/key.pem -out ./certificates/cert.pem -days 365 -nodes
+
+tput setaf 2; tput bold; tput setb 6; echo -e "The following procedure will" \
+   	"enstablish a root CA and sign a certificate request. \nThe certificates" \
+	"will be used by the reverse proxy container. \nAfter every execution you'll" \
+	"have to restart the reverse-proxy container."
+
+wait_user
+
+title "Creating self signed root CA"
+openssl genrsa -des3 -out $CA_KEY 2048
+openssl req -x509 -new -nodes -sha256 -days 1825 -key $CA_KEY -out $CA_CRT
+
+wait_user
+
+title "Creating a Certificate Signing Request"
+openssl genrsa -out $DOMAIN_KEY 2048
+openssl req -new -key $DOMAIN_KEY -out $DOMAIN_CSR
+
+wait_user
+
+title "Signing the previously created CSR as the root CA"
+
+# alt_names should contain all the possible names to reach your website
+# like something.somethingelse and www.something.somethingelse
+cat <<EOF > $DOMAIN_EXT
+authorityKeyIdentifier=keyid,issuer
+basicConstraints=CA:FALSE
+keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = localhost
+EOF
+
+openssl x509 -req -in $DOMAIN_CSR -CA $CA_CRT -CAkey $CA_KEY -CAcreateserial -out $DOMAIN_CRT -days 825 -sha256 -extfile $DOMAIN_EXT
+
+title "Done"

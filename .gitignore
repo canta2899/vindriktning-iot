@@ -6,3 +6,4 @@ engine/env
 env/
 reset
 proxy/certificates
+proxy/.srl
