@@ -27,23 +27,19 @@ This code was heavily inspired by Hypfer: https://github.com/Hypfer/esp8266-vind
 #include "Utils.h"
 
 /*
-  Topic disponibilita esempio: airquality/VINDRKING-EX9763/avaiablity     
-  Topic stato esempio: airquality/VINDRKING-EX9763/state          
-  Nome sensore esempio: VINDRKING-EX976
+  Example of sensorID: VINDRKING-EX976
+  When sensor goes online publishes on: airquality/VINDRKING-EX9763/online     
+  When sensors updates its state publishes on: airquality/VINDRKING-EX9763/state          
 */
 
-
+#define ONLINE "online"
+#define OFFLINE "offline"
 #define MQTT_PORT 1883                      /* Port used by the MQTT publisher */
 #define MQTT_KEEPALIVE 10                   /* Keep alive redefinition for MQTT messages*/
 #define MQTT_BUFSIZE 2048                   /* Buffersize for the MQTT message */
 #define MQTT_PUBLISH_INTERVAL_MS 5000       /* Interval between messages in milliseconds */
 #define MQTT_CONNECTION_INTERVAL_MS 60000   /* Reconnection interval */
 #define OTA_PASS "ikea"                     /* Password for OTA updates */
-
-#define ONLINE "online"
-#define OFFLINE "offline"
-
-
 
 char sensorID[32];                          /* Buffer that contains the sensore UID */
 char MQTT_TOPIC_ONLINE[128];                /* Avaiability message for MQTT */
@@ -118,20 +114,6 @@ void publishState()
 {
   DynamicJsonDocument stateJson(604);   /* Json containing state info */
   char payload[256];                    /* Global payload */
-
-/*
-  {
-    "pm25": valore,
-    "quality": valore
-    "name": "nome",
-    "wifi": {
-      "ssid": SSID
-      "ip": 192.168.1.8
-      "rssi": -3
-    }
-  }
-*/
-
   // State info
   stateJson["pm25"] = state.avgPM25;
   stateJson["ip"] = WiFi.localIP().toString();
