@@ -693,6 +693,25 @@ GROUP BY "name"
 |
 |
 
+La visualizzazione ottenuta consultando la pagina principale è la seguente: 
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=380px]{img/lineplot.png}
+\caption{Lineplot raffigurante l'andamento della qualità dell'aria rilevata}
+\end{figure}
+
+|
+|
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=380px]{img/barplot.png}
+\caption{Barplot raffigurante la qualità media rilevata per ogni sensore}
+\end{figure}
+
+Il tracciato individuato dai sensori "Camera2" e "Cucina", in particolare, risulta quasi sempre analogo a causa della stretta vicinanza fra i due sensori in fase di misurazione. Inoltre, il picco osservato nell'orario corrispondente alle `19:00` è dovuto alla presenza di fumo di sigaretta all'interno della stanza.
+
 ### Gestione degli utenti Telegram
 
 La pagina relativa all'abilitazione degli utenti telegram prevede la renderizzazione di un'apposita tabella riportante gli **utenti attualmente abilitati** con annesso **chat id** (se disponibile). Inoltre, la rimozione di un utente è permessa a seguito di un click sull'apposito pulsante di eliminazione dell'utente, mentre l'aggiunta di un nuovo utente è permessa dal form modale accessibile clickando il pulsante riportante la scritta **Add a User**. Quest'ultimo propone un menu a comparsa che permette all'utente di digitare il nome utente da abilitare e inviare la richiesta.
@@ -795,6 +814,8 @@ Quest'ultimo, in particolare, prevede:
 - L'installazione di **Python**, **pip** e delle librerie necessarie alla corretta esecuzione dell'applicativo
 - La creazione delle directory predisposte al contenimento del codice sorgente dell'applicativo e di eventuali file di log
 - Il popolamento della cartella `/app` con i file presenti al percorso `airpi/app` della macchina host
+
+\newpage
 
 ```python
 
@@ -1039,7 +1060,7 @@ In conclusione, la seguente rappresentazione grafica descrive la soluzione archi
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=550px]{img/architettura3.png}
+\includegraphics[width=450px]{img/architettura.png}
 \end{figure}
 
 \newpage
