@@ -270,7 +270,9 @@ def declare_sensor_status(uid, name, status):
     if uid not in sensor_list.keys():
         sensor_list[uid] = {
             'status': status,
-            'name': name
+            'name': name,
+            'pm25': -1,
+            'quality': -1
         }
     else:
         sensor_list[uid]['status'] = status
@@ -295,12 +297,7 @@ def update_values(uid, pm25, quality, name, ip):
     if uid not in sensor_list.keys():
 
         # entry with invalid params 
-        sensor_list[uid] = {
-                'status': 'online',
-                'pm25': -1,
-                'quality': -1,
-                'name' : name
-        }
+        declare_sensor_status(uid, name, 'online')
         logging.info(f"New entry for {uid} added in sensor list")
 
     # params are updated 
@@ -396,7 +393,7 @@ def on_message(client, userdata, message):
                 'tags': {
                     'quality': msg['quality'],
                     'name': msg['name'],
-                    'ip': msg['wifi']['ip']
+                    'ip': msg['ip']
                 }
             }]
             
@@ -409,7 +406,7 @@ def on_message(client, userdata, message):
                 msg['pm25'], 
                 msg['quality'], 
                 msg['name'], 
-                msg['wifi']['ip']
+                msg['ip']
             )
         except Exception as e:
             traceback.print_exc()
