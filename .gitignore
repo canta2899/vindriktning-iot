@@ -5,4 +5,4 @@ engine/env
 .env
 env/
 reset
-nginx/certificates
+proxy/certificates
