@@ -12,14 +12,16 @@ from flask import (
 from flask_jwt_extended import (
     create_access_token,
     jwt_manager,
-    get_jwt, 
-    get_jwt_identity, 
+    get_jwt,
+    get_jwt_identity,
     jwt_required,
-    JWTManager, 
-    set_access_cookies, 
+    JWTManager,
+    set_access_cookies,
     unset_access_cookies,
     unset_jwt_cookies
 )
+
+from flask_mqtt import Mqtt
 
 # from flask_jwt_extended.utils import get_current_user, get_jwt_header, set_access_cookies
 
@@ -27,50 +29,50 @@ from datetime import datetime, timedelta
 from flask_sqlalchemy import SQLAlchemy
 from passlib.hash import pbkdf2_sha256
 from influxdb import InfluxDBClient
-from waitress import serve
 from bot import Bot
+import traceback
+import logging
 import json
 import os
 
+logging.basicConfig(
+    filename='/log/logfile.log', 
+    level=logging.INFO,
+    format='%(asctime)s : %(levelname)s : %(message)s'
+)
 
 # ------- Variables ------------
 
-USE_WSGI = False
-RUN_BOT = False
+# Bot usage
+RUN_BOT = True 
 
-APP_NAME = os.environ.get('AUTH_APPNAME', 'prova')
-APP_SECRET = os.environ.get('AUTH_APPPASS', 'test')
-APP_ID = 'engineapp'
+# Name of the measurement from the sensor 
+MEASUREMENT = 'airquality'
 
-TOKENS_FILE = '/tokens/tokens.json'
+# Broker params
+BROKER = 'broker'
+STATE_NAME = 'state'
+TOPIC = 'airsensor/#' 
+SENSOR_ONLINE_MSG = "online"
+SENSOR_OFFLINE_MSG = "offline"
+
+# InfluxDB params
 INFLUX_DB_DATABASE = 'airquality'
-
-INFLUX_DB_USER = os.environ.get('INFLUXDB_API_USER', 'bridge')
-INFLUX_DB_PASSWORD = os.environ.get('INFLUXDB_API_PASSWORD', 'bridge')
-# INFLUX_DB_HOST = 'database'         
-INFLUX_DB_HOST = 'localhost'  
+INFLUX_DB_HOST = 'database'
 INFLUX_DB_PORT = 8086
-TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', 'paste-here-your-token')
+INFLUX_DB_USER = os.environ['INFLUXDB_API_USER']
+INFLUX_DB_PASSWORD = os.environ['INFLUXDB_API_PASSWORD']
+TELEGRAM_BOT_TOKEN = os.environ['TELEGRAM_BOT_TOKEN']
 
 
 # -------- Queries -------------
 
-# InfluxDB Queries for charts
 LINE = 'select mean("pm25") from "airquality" where time > now() - 10d group by time(2m), "name" fill(none)'
 BAR = 'select mean("pm25") from "airquality" where time > now() - 10d group by "name"'
 
-
-# -------- App DB init ---------
-
-app = Flask(__name__)
-jwt = JWTManager(app)
-db = SQLAlchemy(app)
-
-
-
 # -------- App Config ----------
 
-# App configuration
+app = Flask(__name__)
 app.config["JWT_COOKIE_SECURE"] = True 
 app.config["JWT_TOKEN_LOCATION"] = ["headers", "cookies"]
 app.config["JWT_SECRET_KEY"] = "secret"
@@ -80,12 +82,24 @@ app.config['JWT_COOKIE_CSRF_PROTECT'] = True
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=1)
 app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///appdb.db"
 app.config['SECRET_KEY'] = '7fb209172a3227ceccd8cb27fbbfd50e00257ac4bf43f0b141fa2ebbc384a0b6'
-# python3 -c 'import secrets; print(secrets.token_hex())'  [to create a new secret key]
+
+app.config['MQTT_BROKER_URL'] = 'broker' 
+app.config['MQTT_BROKER_PORT'] = 1883  
+app.config['MQTT_USERNAME'] = 'mosquitto'
+app.config['MQTT_PASSWORD'] = 'homepass'
+app.config['MQTT_KEEPALIVE'] = 5
+app.config['MQTT_TLS_ENABLED'] = False
 
 
+# ----------- TOOLS -----------
+
+jwt = JWTManager(app)
+mqtt = Mqtt(app)
 sensor_list = dict()
 influxbot = None
+mqttinflux = None
 b = Bot(TELEGRAM_BOT_TOKEN)
+db = SQLAlchemy(app)
 
 
 # -------- DB Models -----------
@@ -95,6 +109,7 @@ class User(db.Model):
     name = db.Column(db.Text, unique=True)
     password = db.Column(db.Text)
     is_admin = db.Column(db.Boolean, default=False)
+
 
 class TelegramUser(db.Model):
     username = db.Column(db.String(50), primary_key=True)
@@ -242,6 +257,188 @@ def start_callback(chat_id, _1, _2):
     )
 
 
+# --------   MQTT    ----------
+
+def declare_sensor_status(uid, name, status):
+
+    """
+        Registers a sensor status (online or offline). 
+        If the sensor is not known, creates an entry 
+        in the sensor collection
+    """
+    
+    if uid not in sensor_list.keys():
+        sensor_list[uid] = {
+            'status': status,
+            'name': name
+        }
+    else:
+        sensor_list[uid]['status'] = status
+
+
+def update_values(uid, pm25, quality, name, ip):
+
+    """
+        Updates last known sensor update
+        
+        [uid]     :  sensor id (ie VINDRIKTNING-54F9AE)
+        [pm25]    :  air quaity measured
+        [quality] :  quality class (0,1,2)
+        [name]    :  sensor name 
+        [ip]      :  the ip of the sensor in the local network
+    """
+
+    global sensor_list
+
+
+    # If for some reasons the sensor is not known, it's registered as an online sensor
+    if uid not in sensor_list.keys():
+
+        # entry with invalid params 
+        sensor_list[uid] = {
+                'status': 'online',
+                'pm25': -1,
+                'quality': -1,
+                'name' : name
+        }
+        logging.info(f"New entry for {uid} added in sensor list")
+
+    # params are updated 
+    actual_quality = sensor_list[uid]['quality']
+    sensor_list[uid]['pm25'] = pm25
+    sensor_list[uid]['quality'] = quality
+    sensor_list[uid]['name'] = name
+
+
+    # If quality differs from the previous one a notification is pushed
+
+    if actual_quality != quality:
+        # logging.debug("Pushing notification")
+        if quality == 0: 
+            msg = f"🟢 The air quality in {name} is getting good"
+        elif quality == 1:
+            msg = f"🟠 The air quality in {name} is getting unpleasant"
+        else:
+            msg = f"🔴 The air quality in {name} is getting unacceptable"
+
+        # logging.info(f"Sensor {name} ({ip}) is triggering a notification")
+        
+        users = TelegramUser.query.all() 
+        b.push_notification(msg, [user.chat_id for user in users if user.chat_id is not None])
+        
+        logging.info(f"Sensor {name} pushed a notification")
+
+
+@mqtt.on_message()
+def on_message(client, userdata, message):
+
+    """
+        MQTT Callback which defines the main routine 
+        when a message on the subscribed topic is 
+        received. In this case, topic is airsensor/# 
+        so every subtopic's message will be received too
+    """
+
+    try:
+        # Splits the topic
+        topic = message.topic.split("/")
+
+        # Decodes the message
+        msg = message.payload.decode() 
+        
+        # Extracts sensor UID and subtopic name
+        sensor_name = topic[1]
+        sensor_subtopic = topic[-1]
+    except Exception as e:
+        logging.warning(
+            f"Received invalid message on {'/'.join(topic)}"
+        )
+        traceback.print_exc()
+        return
+
+
+    # If the topic is about availability and 
+    # message is offline, it means that the 
+    # sensor has gone offline
+
+    if sensor_subtopic == SENSOR_ONLINE_MSG:
+        logging.warning(
+            f"{msg} connected to the network."
+        )
+        declare_sensor_status(sensor_name, msg, SENSOR_ONLINE_MSG)
+        return
+
+    # If the topic is about availability and message is online, it means
+    # that the sensor is online
+
+    if sensor_subtopic == SENSOR_OFFLINE_MSG:
+        logging.info(
+            f"{msg}  disconnected from the network"
+        ) 
+        declare_sensor_status(sensor_name, msg, SENSOR_OFFLINE_MSG)
+        return
+
+
+    # If the topic is about state the message 
+    # should be a json with updates about the sensor state
+
+    if sensor_subtopic == STATE_NAME:
+        try:
+            # JSON is loaded from string msg
+            msg = json.loads(msg)        
+
+            points = [{
+                'measurement': MEASUREMENT,
+                'time': datetime.now(),
+                'fields': {
+                    "pm25": msg['pm25']    
+                },
+                'tags': {
+                    'quality': msg['quality'],
+                    'name': msg['name'],
+                    'ip': msg['wifi']['ip']
+                }
+            }]
+            
+                
+            get_mqtt_influx().write_points(points)
+
+            # Updating last known sensor values (triggers notifications)
+            update_values(
+                sensor_name, 
+                msg['pm25'], 
+                msg['quality'], 
+                msg['name'], 
+                msg['wifi']['ip']
+            )
+        except Exception as e:
+            traceback.print_exc()
+            logging.error(
+                f"Couldn't perform update query for "
+                f"{sensor_name} with msg: {msg}. Stacktrace: \n\n"
+                f"{traceback.format_exc()}"
+            )
+        
+            
+# @mqtt.on_connect()
+# def handle_connect(client, userdata, flags, rc):
+#     mqtt.subscribe(TOPIC)
+#     logging.info("Subscribed to general topic")
+
+
+# Starting bot and subscribing to mqtt topic
+if RUN_BOT:
+    b.on('/status', status_callback)
+    b.on('/info', info_callback)
+    b.on('/bind', bind_callback)
+    b.on('/start', start_callback)
+    b.run()
+    logging.info("Bot is online")
+
+logging.info("Subscribed to general topic")
+mqtt.subscribe(TOPIC)
+
+
 # -------- Utilities -----------
 
 def get_influx():
@@ -291,6 +488,29 @@ def get_bot_influx():
             pass
     return influxbot
 
+def get_mqtt_influx():
+
+    """
+        Returns influxDB connection instance for TelegramBot
+        exceution context in order to query last sensor value
+    """
+
+    global mqttinflux
+    if not mqttinflux:
+        try:
+            mqttinflux = InfluxDBClient(
+                    INFLUX_DB_HOST, 
+                    INFLUX_DB_PORT, 
+                    INFLUX_DB_USER, 
+                    INFLUX_DB_PASSWORD, 
+                    INFLUX_DB_DATABASE
+            )
+
+            mqttinflux.switch_database(INFLUX_DB_DATABASE)
+        except Exception as e:
+            pass
+    return mqttinflux
+
 
 def defaultconverter(o):
     
@@ -320,6 +540,11 @@ def is_from_browser(user_agent):
         "seamonkey",
         "webkit",
     ] 
+
+
+
+# -------- Endpoints -----------
+        
         
 # Allows to handle the automatic token refresh if desired
 
@@ -351,6 +576,7 @@ def expired_token(jwt_header, jwt_payload):
     if is_from_browser(request.user_agent):
         return render_template('login.html', logged=False, admin=False)
     return jsonify({'msg': 'Not authorized', 'description': 'Token has expired'}), 401
+
 
 @app.route('/')
 @jwt_required(optional=True)
@@ -424,30 +650,6 @@ def databar():
         json.dumps(chart_data),
         mimetype='application/json'
     )
-
-
-@app.route('/api/airquality', methods=['POST'])
-@jwt_required()
-def airquality():
-
-    """
-        Received air quality update from authorized
-        applications. Then, performs database logging
-    """
-
-    current_identity = get_jwt_identity()
-
-    if is_from_browser(request.user_agent):
-        return jsonify({'msg': 'Forbidden'}), 403
-
-    try:
-        new_status = request.get_json()
-        new_status['time'] = datetime.now()
-    except Exception as e:
-        return jsonify({'msg': 'Bad request'}), 400
-
-    get_influx().write_points([new_status])
-    return jsonify({'msg': 'ok'}), 200
 
 
 @app.route("/api/telegram", methods=['GET', 'POST', 'DELETE'])
@@ -582,8 +784,6 @@ def users_api():
             new_is_admin = jreq['newAdmin']
         except Exception as e:
             return jsonify({'msg': 'Bad request'}), 400
-            
-        # TODO check requestor password
 
         if not pbkdf2_sha256.verify(password, requestor.password):
             return jsonify({'msg': 'Wrong password'}), 401
@@ -662,6 +862,7 @@ def users():
             return render_template('users.html', logged=True, admin=True)
     return redirect('/')
 
+
 @app.route("/me", methods=['GET'])
 @jwt_required()
 def me():
@@ -717,6 +918,7 @@ def api_me():
 
     return jsonify({'msg': 'Wrong password'}), 400
 
+
 @app.route("/api/auth", methods=['POST'])
 def auth_api():
 
@@ -724,41 +926,30 @@ def auth_api():
         Handles jwt authorization
     """
 
-    if is_from_browser(request.user_agent):
-        try:
-            jreq = request.get_json()
-            username = jreq['username']
-            password = jreq['password']
-        except Exception as e:
-            return jsonify({'msg': 'Bad request'}), 400        
-        
-        # TODO check if user is valid and produce access token
+    try:
+        jreq = request.get_json()
+        username = jreq['username']
+        password = jreq['password']
+    except Exception as e:
+        return jsonify({'msg': 'Bad request'}), 400        
+    
+    try:
+        logging.debug("Checking user for auth request")
         user = User.query.filter_by(name=username).first()
+    except Exception as e:
+        logging.debug("error 500")
+        logging.debug(f"{traceback.format_exc()}")
 
-        if not user:
-            return jsonify({'msg': 'Unknown user'}), 409
-        
-        if not pbkdf2_sha256.verify(password, user.password):
-            return jsonify({'msg': 'Wrong password'}), 401
-        
-        response = jsonify({"msg": "login successful"})
-        access_token = create_access_token(identity=user.id)
-        set_access_cookies(response, access_token)
-        return response
-    else:
-        # Gets name and secret from header
-        try:
-            appname = request.headers.get('appName')
-            secret = request.headers.get('secret')
-        except Exception as e:
-            return jsonify({'msg': 'Bad request'}), 400
-
-        if appname == APP_NAME and secret == APP_SECRET:
-            access_token = create_access_token(identity=APP_ID)
-            return jsonify({'access_token': access_token}), 200
-        
-        return jsonify({'msg': 'Not Authorized'}), 401
-
+    if not user:
+        return jsonify({'msg': 'Unknown user'}), 409
+    
+    if not pbkdf2_sha256.verify(password, user.password):
+        return jsonify({'msg': 'Wrong password'}), 401
+    
+    response = jsonify({"msg": "login successful"})
+    access_token = create_access_token(identity=user.id)
+    set_access_cookies(response, access_token)
+    return response
 
 @app.route("/login", methods=['GET'])
 @jwt_required(optional=True)
@@ -788,79 +979,8 @@ def logout():
     return response
 
 
-@app.route("/api/status", methods=['POST'])
-@jwt_required()
-def status():
-
-    """
-        Receives sensor status update from authorized
-        source and updates sensor status locally
-    """
-    
-    current_identity = get_jwt_identity()
-
-    if is_from_browser(request.user_agent):
-        return jsonify({'msg': 'Forbidden'}), 403
-
-    try:
-        jreq = request.get_json()
-
-        uid = jreq['uid']
-        status = jreq['status']
-        name = jreq['name'] # TODO expects name from the request
-    except Exception as e:
-        return jsonify({'msg': 'Bad request'}), 400        
-
-    if uid not in sensor_list.keys():
-        sensor_list[uid] = {
-            'status': status,
-            'name': name
-        }
-    else:
-        sensor_list[uid]['status'] = status
-    
-    return jsonify({'msg': 'ok'}), 200
-
-
-@app.route("/api/bot/notification", methods=['POST'])
-@jwt_required()
-def notify_bot():
-
-    """
-        Receives a bot notification request from authorized
-        source and triggers a bot notification to all the
-        binded users
-    """
-    current_identity = get_jwt_identity()
-
-    if is_from_browser(request.user_agent):
-        return jsonify({'msg': 'Forbidden'}), 403
-
-    try:
-        jreq = request.get_json()
-        msg = jreq['msg']
-    except Exception as e:
-        return jsonify({'msg': 'Bad request'}), 400        
-
-    users = TelegramUser.query.all() 
-    b.push_notification(msg, [user.chat_id for user in users if user.chat_id is not None])
-    return jsonify({'msg': 'ok'})
-
-
 # Run the app
 if __name__ == "__main__":
     
     # Binds bot to callback
-    if RUN_BOT:
-        b.on('/status', status_callback)
-        b.on('/info', info_callback)
-        b.on('/bind', bind_callback)
-        b.on('/start', start_callback)
-        b.run()
-    
-    if USE_WSGI:
-        # Production server
-        serve(app, host='0.0.0.0', port=8080, url_scheme='https')
-    else:
-        # Development server
-        app.run(debug=True, host='0.0.0.0', port=8080)
+    app.run()

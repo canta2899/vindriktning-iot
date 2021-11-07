@@ -1,5 +1,5 @@
 ---
-title: "Applicazione di integrazioni IoT ad un sistema di monitoraggio della qualità dell'aria"
+title: "Applicazione di integrazioni IoT ad uno strumento per il monitoraggio della qualità dell'aria"
 author: |
         | Andrea Cantarutti (141808)
         | Lorenzo Bellina (142544)
@@ -23,22 +23,6 @@ header-includes:
 \newpage
 \tableofcontents
 \newpage
-
-```{=latex}
-% introduzione
-% il sensore dell'ikea e i dati che misura
-% anatomia del sensore e modding del sensore (con costi)
-% codice arduino
-% architettura docker
-% broker mqtt
-% logapp
-% influxdb
-% mqtt app
-% funzionamento del bot telegram
-% dashboard e grafici con grafana
-% Deployment su raspberry pi (nota su costo raspberry pi)
-% Conclusioni e followups (app al posto del bot telegram, possibilità di integrazione con altri sistemi ikea fra cui ad esempio il purificatore)
-```
 
 # Introduzione
 
@@ -74,7 +58,7 @@ VINDRIKTNING non dispone, tuttavia, di ulteriori funzionalità, assestandosi in 
 In seguito all'acquisto di due unità VINDRIKTNING e ad un breve periodo di utilizzo, sulla base delle necessità individute sono stati descritti i seguenti requisiti:
 
 - Possilità di osservare e analizzare l'andamento della qualità dell'aria in un determinato lasso di tempo
-- Possibilità di aggregare i dati provenienti da più sensori collocati in diverse stanze e/o diverse abitazioni
+- Possibilità di aggregare i dati provenienti da più sensori collocati in diverse zone dell'abitazione
 - Facoltà di interrogare i sensori da remoto, ricevendo notifiche nel caso del superamento dei threshold specificati.
 
 ## Definizione dei principali servizi
@@ -264,7 +248,7 @@ Nel caso in cui la connessione alla rete WiFi selezionata vada a buon fine, il m
 
 ### Comunicazione con il Broker MQTT
 
-La gestione della connessione e dell'invio di messaggi al Broker MQTT è stata, invece, affidata alla liberia **PubSubClient**. Ad intervalli specificati dalla macro `MQTT_PUBLISH_INTERVAL_MS`, un'eventuale rilevazione valida viene inviata al Broker sull'apposito topic di aggiornamento dello stato di qualità dell'aria. Nel caso di assenza di connettività, invece, il sistema tenta regolarmente una riconnessione finchè questa non risulta avvenuta. 
+La gestione della connessione e dell'invio di messaggi al Broker MQTT è stata, invece, affidata alla liberia **PubSubClient**. Ad intervalli specificati dalla macro `MQTT_PUBLISH_INTERVAL_MS`, un'eventuale rilevazione valida viene inviata al Broker sull'apposito topic di aggiornamento dello stato di qualità dell'aria. Nel caso di assenza di connettività, invece, il sistema tenta regolarmente una riconnessione finché questa non risulta avvenuta. 
 
 Due ulteriori messaggi vengono, infine, comunicati al broker al momento della connessione:
 
@@ -294,7 +278,7 @@ Sulla base delle decisioni architetturali riportate in precedenza, è stato scel
 |
 |
 
-```{dockerfile}
+```Dockerfile
 
 FROM eclipse-mosquitto
 
@@ -371,102 +355,6 @@ exec "$@"
 |
 |
 
-Una volta eseguito, il servizio risulta accessibile alla porta 1883 del container.
-
-\newpage
-
-# Ricezione dei dati
-
-## Engine
-
-La ricezione dei dati trasmessi dalle unità VINDRIKTNING è stata affidata ad un servizio denominato **Engine**. Quest'ultimo, una volta collegatosi al Broker MQTT in qualità di **subscriber** ed iscrittosi ai topic di interesse, interagisce con i dati ottenuti dai sensori connessi svolgendo le seguenti attività:
-
-- Trasmissione dei dati al servizio centralizzato di storage
-- Esecuzione di opportune routine per la notifica del superamento di determinati threshold
-
-## Containerizzazione 
-
-Il servizio è stato implementato in **Python** sfruttando le librerie **Requests** e **Paho MQTT Python Client** ed è stato, successivamente, containerizzato a partire dall'immagine **Alpine** tramite il Dockerfile di seguito riportato. Quest'ultimo prevede:
-
-- L'installazione delle librerie necessarie
-- La creazione di una cartella che andrà a contenere il file di log prodotto dal programma nel corso della sua esecuzione
-- L'aggiunta del programma `engine.py` e dello script `entrypoint.sh` per l'inizializzazione del container
-
-|
-|
-
-```dockefile
-
-FROM alpine
-
-RUN apk add --update --no-cache python3
-RUN python3 -m ensurepip
-RUN pip3 install --no-cache --upgrade pip setuptools
-RUN pip3 install --no-cache --upgrade paho-mqtt
-RUN pip3 install --no-cache --upgrade requests
-RUN mkdir /log
-
-ADD ./engine.py /
-ADD ./entrypoint.sh /
-
-ENTRYPOINT ["sh", "/entrypoint.sh"]
-
-CMD ["python3", "/engine.py"]
-
-```
-
-|
-|
-
-Lo script `entrypoint.sh` esegue le seguenti istruzioni al fine di mantenere disponibile il logfile **antecedente** all'ultimo riavvio del sistema nel caso in cui questo sia disponibile grazie all'impiego di un volume persistente. Questo permette all'utilizzatore di individuare le motivazioni che hanno provocato la più recente interruzione del programma.
-
-|
-|
-
-```bash
-
-set -e
-
-mkdir -p /log
-touch /log/logfile.log
-cp /log/logfile.log /log/report.log
-cat /dev/null > /log/logfile.log
-exec "$@"
-
-```
-
-Il codice sorgente dell'applicativo è consultabile al path `engine/engine.py` della repository.
-
-
-## Comunicazione con VINDRIKTNING 
-
-La ricezione dei dati tramessi dalle unità VINDRIKTNING al Broker MQTT sui topic d'interesse richiede l'autenticazione di Engine. A tal fine, il container prevede la definizione delle variabili d'ambiente `MOSQUITTO_USERNAME` e `MOSQUITTO_PASSWORD` in riferimento, rispettivamente, al nome utente e alla password previsti da Eclipse Mosquitto a seguito della configurazione sopradescritta.
-
-## Trasmissione dei dati ricevuti
-
-Ad ogni nuovo messaggio ricevuto, Engine comunica la nuova osservazione o l'eventuale aggiornamento di stato di un sensore ad un servizio denominato **AirPI** (descritto nel dettaglio nel corso dei capitoli successivi). La completa comunicazione fra Engine ed AirPI richiede la presenza di: 
-
-- Un endpoint per la comunicazione di **aggiornamenti di stato** di un'unità VINDRIKTNING
-- Un endpoint per la comunicazione di **nuove rilevazioni** da parte di un sensore
-- Un endpoint per l'innesco di un **evento di notifica** all'atto del superamento di specifici threshold
-
-Questi ultimi vengono rispettivamente codificati, all'interno del programma, dalle seguenti variabili d'ambiente:
-
-- `SENSOR_STATUS_ENDPOINT`
-- `DATA_ENDPOINT`
-- `NOTIFICATION_ENDPOINT`
-
-La comunicazione prevede, infine, un'autenticazione di Engine presso AirAPI basata su Json Web Tokens. A tal fine, l'applicativo necessita della presenza di:
-
-- Un endpoint per l'**autenticazione** del servizio
-- Un **identificativo** e un **secret** al fine di poter richiedere un token di autenticazione 
-
-Tali parametri vengono codificati dalle seguenti variabili d'ambiente:
-
-- `AUTH_ENDPOINT`
-- `AUTH_APPNAME`
-- `AUTH_APPPASS`
-
 \newpage
 
 # Definizione di un database per lo storage dei dati
@@ -524,22 +412,29 @@ Una volta avviato, il servizio risulterà disponibile all'uso ed accessibile tra
 
 # AirPI
 
-Al fine di fornire uno strumento per la **ricezione centralizzata dei dati** e l'invio di **notifiche in tempo reale** all'utilizzatore, è stato implementato il servizio **AirPI**. Quest'ultimo è costituito da un'API di tipo REST (implementata tramite il microframework Flask), che può essere amministrata e configurata da uno o più utenti tramite un apposito applicativo web-based denominato **VINDRKTNING Station - Monitoring Tool**.  
+Al fine di fornire uno strumento rivolto alla **fruizione** e **ricezione centralizzata dei dati**, oltre che all'invio di **notifiche in tempo reale** all'utilizzatore, è stato implementato il servizio **AirPI**. Quest'ultimo è costituito da un'API di tipo REST (implementata tramite il microframework Flask) abilitata alla ricezione dei dati trasmessi dai sensori, che può essere amministrata e configurata da uno o più utenti tramite un apposito applicativo web-based denominato **VINDRKTNING Station - Monitoring Tool**.
+
+## Ricezione dei dati tramite protocollo MQTT
+
+L'implementazione di AirPI prevede la definizione di un **subscriber MQTT** implementato tramite il middleware **Flask-MQTT**, che fornisce un wrapper rivolto all'integrazione della libreria **Paho MQTT Client** in **Flask**. 
+
+In particolare, la configurazione del client MQTT è permessa dalle seguenti variabili d'ambiente, appositamente associate ai rispettivi parametri definiti all'interno del codice sorgente:
+
+- `MOSQUITTO_USERNAME` (nome utente necessario alla comunicazione con il Broker MQTT)
+- `MOSQUITTO_PASSWORD` (password necessaria alla comunicazione con il Broker MQTT)
+
+L'implementazione prevede, quindi:
+
+- L'iscrizione al topic `airsensor/#`
+- La gestione e lo storage dei messaggi ricevuti tramite un'apposita routine identificata dal decoratore `@mqtt.on_message()`
+
+Nello specifico, i dati ricevuti permettono l'aggiornamento dell'ultimo stato noto del sensore e l'eventuale esecuzione di opportune query di inserimento (tramite la libreria **InfluxDB Client**) al fine di serializzare i dati ricevuti (e corredati di apposito timestamp) all'interno del database.
 
 ## Autenticazione
 
-Al fine di permettere la ricezione di dati e aggiornamenti da parte dei soli servizi Engine autorizzati e al fine di garantire l'amministrazione del sistema ai soli utenti autorizzati, AirPI presenta un sistema di **autenticazione** basato su **JSON Web Tokens**, implementato tramite il middleware **flask_jwt_extended**.
+Al fine di garantire l'amministrazione del sistema ai soli utenti autorizzati, AirPI presenta un sistema di **autenticazione** basato su **JSON Web Tokens**, implementato tramite il middleware **flask_jwt_extended**.
 
-Eventuali richieste ed aggiornamenti provenienti da servizi Engine richiedono, pertanto, la presenza di un apposito **token** all'interno dell'header della richiesta. Quest'ultimo presenta una durata limitata e può essere richiesto, in cambio di apposite credenziali, interrogando l'endpoint di autenticazione `/api/auth`. Allo stesso modo, l'accesso agli endpoint utilizzati dall'applicativo Monitoring Tool richiede un token, ottenuto in seguito ad avvenuto log-in per mezzo di username e password.
-
-## Ricezione e serializzazione dei dati 
-
-La ricezione di aggiornamenti relativi ai sensori e alla qualità rilevata avviene per mezzo di richieste `HTTP` di tipo `POST` tramite gli endpoint:
-
-- `/api/airquality` (predisposto alla ricezione di una nuova rilevazione)
-- `/api/status` (predisposto alla registrazione di una variazione di stato da parte di uno specifico sensore)
-
-In seguito ad una verifica della loro autenticità, i dati ricevuti vengono scritti all'interno dell'apposito database tramite apposite query di inserimento. La connessione e la successiva comunicazione con il DBMS dipendono dalla libreria **InfluxDBClient**, la quale permette l'istanziazione di una connessione con il database e il successivo inserimento dati tramite il metodo `write_points()`.
+Eventuali richieste agli endpoint richiedono, pertanto, la presenza di un apposito **token** all'interno dell'header della richiesta. Quest'ultimo presenta una durata limitata e può essere richiesto, in cambio di valide credenziali, interrogando l'endpoint `/api/auth`.
 
 ## Notifica degli utenti
 
@@ -600,7 +495,7 @@ Sulla base delle funzionalità necessarie, nel caso di AirPI sono stati implemen
 
 ### Invio di notifiche
 
-L'invio di specifici messaggi di notifica avviene in seguito ad apposite richieste `HTTP` di tipo `POST` inviate all'endpoint `/api/bot/notification` dal servizio Engine, specificando il messaggio da trasmettere a tutti gli utenti che hanno, in precedenza, eseguito il comando `/bind`. In particolare, come trattato in precedenza, l'implementazione di Engine prevede l'invio di uno dei seguenti messaggi ad ogni variazione di **classe di qualità** rilevata da un'unità VINDRKTNING:
+L'invio di specifici messaggi di notifica avviene in seguito alla rilevazione di variazioni notevoli misurate da un sensore. Viene, quindi, specificato il messaggio da trasmettere a tutti gli utenti che hanno, in precedenza, eseguito il comando `/bind`. In particolare, è previsto l'invio di uno dei seguenti messaggi ad ogni variazione di **classe di qualità** rilevata da un'unità VINDRKTNING:
 
 | Messaggio | Classe di qualità |
 |-----------|-------------------|
@@ -816,13 +711,17 @@ L'endpoint `/api/me` di AirPI permette, infine, ad utenti amministratori e non d
 
 ## Installazione di un server WSGI
 
-### Waitress
+### Gunicorn 
 
-Nonostante Flask permetta l'esecuzione di un server di sviluppo tramite l'utility `flask run`, è stato scelto di eseguire AirPI per mezzo di un server di produzione di tipo WSGI al fine di garantire maggiore efficienza, stabilità e sicurezza da parte dell'applicativo. È stata, quindi, impiegata la libreria **Waitress** che, una volta installata tramite `pip`, permette l'esecuzione di un'app Flask sfruttando la chiamata alla funzione `serve()` in sostituzione ad `app.run()` (che lancia il server di sviluppo).
+Nonostante Flask permetta l'esecuzione di un server di sviluppo tramite l'utility `flask run`, è stato scelto di eseguire AirPI per mezzo di un server di produzione di tipo WSGI al fine di garantire maggiore efficienza, stabilità e sicurezza da parte dell'applicativo. È stata, quindi, impiegata la libreria **gunicorn** che, una volta installata tramite `pip`, permette l'esecuzione di un'app Flask sfruttando il comando
+
+```bash
+gunicorn app:app -w 1 --bind 0.0.0.0:5000
+```
 
 ### Definizione di un servizio di Reverse Proxy
 
-Constatata l'incompatibilità di Waitress con il protocollo `HTTPs`, al fine di garantire una connessione sicura è stato definito un servizio di **reverse proxy** tramite un web server **nginx** dedicato.
+Con l'obiettivo di garantire una connessione sicura è stato definito un servizio di **reverse proxy** tramite un web server **nginx** dedicato.
 
 In particolare, l'obiettivo di quest'ultimo è quello di redirezionare le richieste al web server WSGI di AirPI e trasmettere le risposte ottenute tramite una connessione sicura con l'utente finale. La configurazione del reverse proxy prevede, inoltre, la redirezione di richieste `HTTP` ad `HTTPs`.
 
@@ -832,7 +731,7 @@ I certificati necessari all'apertura di una connessione sicura possono essere ge
 - Sfruttando il servizio gratuito **Let's Encrypt** (che permette la generazione tramite il tool **Certbot**)
 - Appoggiandosi ad altri servizi (gratuiti o a pagamento) in grado di fornire certificati firmati da Certification Autorities note 
 
-Al fine di semplificare le attività di testing, lo script shell `nginx/gen-certs` permette, tramite OpenSSL, la generazione dei certificati necessari all'interno della directory `nginx/certificates/`.
+Al fine di semplificare le attività di testing, lo script shell `proxy/gen-certs` permette, tramite OpenSSL, la generazione dei certificati necessari all'interno della directory `proxy/certificates/`.
 
 ## Variabili d'ambiente utilizzate
 
@@ -840,19 +739,19 @@ Al fine di una corretta esecuzione, l'applicativo prevede la presenza delle segu
 
 | Variabile | Descrizione |
 |-----------|-------------|
-| `AUTH_APPNAME` | Nome utente del servizio di Engine a fini di autenticazione |
-| `AUTH_APPPASS` | Secret trasmesso dal servizio di Engine a fini di autenticazione |
 | `TELEGRAM_BOT_TOKEN` | Token utilizzato dalla classe `Bot` al fine di controllare il bot telegram creato |
 | `INFLUXDB_API_USER` | Nome utente per connessione ad InfluxDB tramite InfluxDBClient |
 | `INFLUXDB_API_PASSWORD` | Password per connessione ad InfluxDB tramite InfluxDBClient |
 | `AUTH_USERNAME` | Nome utente del primo utente amministratore, creato automaticamente per Monitoring Tool |
 | `AUTH_USERPASS` | Password del primo utente amministratore, creato appositamente per accedere a Monitoring Tool |
+| `MOSQUITTO_USERNAME` | Nome utente necessario alla connessione con il servizio di MQTT Brokering |
+| `MOSQUITTO_PASSWORD` | Password necessaaria alla connessione con il servizio di MQTT Brokering |
 
 \newpage
 
 ## Containerizzazione di AirPI 
 
-Come per i servizi precedentemente descritti, anche per AirPI è stata adottata una strategia basata sull'utilizzo di Docker al fine di racchiudere il servizio all'interno di un apposito container. A tal fine, a partire dall'immagine ufficiale **Alpine** è stato prodotto il Dockerfile riportato di seguito.
+Come per i servizi precedentemente descritti, anche per AirPI è stata adottata una strategia basata sull'utilizzo di Docker al fine di racchiudere il servizio all'interno di un apposito container. A tal fine, a partire dall'immagine ufficiale **Alpine** è stato prodotto il Dockerfile di seguito riportato.
 
 |
 |
@@ -867,14 +766,14 @@ RUN apk add --update --no-cache sqlite
 RUN apk add --update --no-cache python3 && ln -sf python3 /usr/bin/python
 RUN python3 -m ensurepip
 RUN apk add py3-sqlalchemy
-RUN apk add py-openssl
 RUN pip3 install --no-cache --upgrade pip setuptools
 RUN pip3 install --no-cache --upgrade flask
 RUN pip3 install --no-cache --upgrade influxdb
 RUN pip3 install --no-cache --upgrade flask_sqlalchemy
 RUN pip3 install --no-cache --upgrade flask_jwt_extended
+RUN pip3 install --no-cache --upgrade Flask-MQTT
 RUN pip3 install --no-cache --upgrade passlib
-RUN pip3 install --no-cache --upgrade waitress
+RUN pip3 install --no-cache --upgrade gunicorn
 
 RUN mkdir /app
 RUN mkdir /log
@@ -885,14 +784,6 @@ COPY ./app /app
 COPY ./entrypoint.sh /entrypoint.sh
 
 ENTRYPOINT ["sh", "/entrypoint.sh"]
-
-# Development server commands
-# RUN export FLASK_APP=app.py
-# RUN export FLASK_ENV=development
-# CMD ["flask", "run", "--host=0.0.0.0", "--port=8080"]
-
-# Production server
-CMD ["python3", "app.py"]
 ```
 
 |
@@ -904,11 +795,6 @@ Quest'ultimo, in particolare, prevede:
 - L'installazione di **Python**, **pip** e delle librerie necessarie alla corretta esecuzione dell'applicativo
 - La creazione delle directory predisposte al contenimento del codice sorgente dell'applicativo e di eventuali file di log
 - Il popolamento della cartella `/app` con i file presenti al percorso `airpi/app` della macchina host
-- L'aggiunta dello script `/entrypoint.sh`, consultabile al path `airpi/entrypoint.sh`
-- La definizione dello script di entrypoint all'interno del container
-- La definizione del comando di esecuzione del server di produzione tramite Waitress
-
-Le linee commentate permettono, se opportunamente sostituite al comando finale, l'esecuzione di AirPI per mezzo del server di sviluppo integrato in Flask. Il comando di entrypoint prevede, invece, l'esecuzione del codice contenuto in `/app/first_user.py` prima dell'avvio dell'applicativo. In particolare, lo script Python (il cui codice è di seguito riportato) prevede, sulla base delle sopracitate variabili d'ambiente `AUTH_USERNAME` e `AUTH_USERPASS`, la configurazione del primo utente amministratore di AirPI.
 
 ```python
 
@@ -925,19 +811,34 @@ conn = sqlite3.connect(DB)
 c = conn.cursor()
 
 try:
-    c.execute(
-		'INSERT INTO user(name, password, is_admin) 
-		VALUES (?,?,1)', 
-		(USERNAME, pbkdf2_sha256.hash(PASSWORD))
-	)
-    conn.commit()
+    c.execute('SELECT name FROM user where name=?', (USERNAME,))
+
+    if not c.fetchone():
+        c.execute('
+			INSERT INTO user(name, password, is_admin) VALUES (?,?,1)', 
+			(USERNAME, pbkdf2_sha256.hash(PASSWORD))
+		)
+        conn.commit()
 except Exception as e:
     conn.rollback()
 finally:
     conn.close()
 
 sys.exit(0)
+
 ```
+
+Non essendovi un comando espresso tramite l'istruzione `CMD` o `ENTRYPOINT`, è necessario che il container venga eseguito esplicitando i seguenti comandi: 
+
+```bash
+python3 first_user.py
+gunicorn app:app -w 1 --bind 0.0.0.0:5000
+```
+
+Questi ultimi prevedono:
+
+- La creazione del primo utente del database (nel caso in cui quest'ultimo non risulti presente)
+- L'esecuzione di AirPI tramite Gunicorn (dove `-w 1`, in particolare, esplicita un numero di workers pari ad uno a fini di compatibilità con Flask MQTT)
 
 |
 |
@@ -987,7 +888,7 @@ server {
 
  location / {
 
-           proxy_pass http://airpi:8080/;
+           proxy_pass http://airpi:5000/;
 		   proxy_set_header Host $host;
            proxy_set_header X-Real-IP $remote_addr;
 		   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -1008,7 +909,6 @@ server {
     return 302 https://$server_name$request_uri;
 }
 
-
 ```
 
 \newpage
@@ -1017,14 +917,7 @@ server {
 
 ## Soluzione adottata per il dispiegamento dei servizi 
 
-Il dispiegamento dei servizi descritti è reso possibile dallo strumento `docker-compose`, che permette la definizione e organizzazione di applicativi multi-container tramite l'apposito file `docker-compose.yaml` consultabile alla root directory della repository. 
-
-In particolare, le due principali soluzioni di deployment risultano: 
-
-1. L'organizzazione di un unico stack multi-container (ideale per un utilizzo interno ad una rete domestica)
-2. L'organizzazione di due stack multi-container, al fine di rafforzare l'indipendenza fra i servizi di MQTT Brokering ed Engine e quelli di Database ed AirPI (rendendo così possibile il dispiegamento di InfluxDB, AirPI e Reverse Proxy nel cloud)
-
-Va tenuto presente come, nel caso dell'adozione della seconda opzione, si renda necessaria la modifica dei riferimenti agli endpoint di AirPI sostituendo l'indirizzo `https://proxy/` (rappresentante il container nginx) con l'indirizzo ip o il dominio della macchina responsabile dell'hosting del servizio. 
+Il dispiegamento dei servizi descritti è reso possibile dallo strumento `docker-compose`, che permette la definizione e organizzazione di applicativi multi-container tramite l'apposito file `docker-compose.yaml` consultabile alla root directory della repository. In particolare, la principale soluzione di deployment prevede l'organizzazione di un unico stack multi-container.
 
 ## Aspetti di docker-compose coinvolti
 
@@ -1040,41 +933,15 @@ All'interno del file `docker-compose`, per ogni servizio vengono specificati:
 
 Al fine di agevolare l'eventuale modifica delle variabili d'ambiente necessarie, quest'ultime sono state descritte all'interno di un file `.env` (consultabile all'interno della root directory della repository). Quest'ultimo viene, infatti, automaticamente letto dal file `docker-compose` durante la sua esecuzione.
 
-La specifica delle variabili d'ambiente in `docker-compose.yaml` avviene, pertanto, mediante la sintassi
-
-```bash
-- VARIABLE_NAME = ${VARIABLE_NAME_ENVFILE}
-```
-
-Dove `VARIABLE_NAME` riferisce il nome assunto dalla variabile all'interno del container e `VARIABLE_NAME_ENVFILE` riferisce il nome della variabile della quale acquisire il valore specificato all'interno del file `.env`. Nello specifico, al fine di evitare ambiguità, è stato scelto di mantenere identico il nome di ogni variabile rispetto al corrispondente riferimento all'interno del file.
-
 Il risultato finale viene riportato di seguito:
 
 ```docker-compose
 
 version: "3"
 services:
-  engine:
-    build:
-      context: ./engine
-    container_name: engine 
-    environment:
-      - MOSQUITTO_USERNAME=${MOSQUITTO_USERNAME}
-      - MOSQUITTO_PASSWORD=${MOSQUITTO_PASSWORD}
-      - SENSOR_STATUS_ENDPOINT=${SENSOR_STATUS_ENDPOINT}
-      - DATA_ENDPOINT=${DATA_ENDPOINT}
-      - NOTIFICATION_ENDPOINT=${NOTIFICATION_ENDPOINT}
-      - AUTH_ENDPOINT=${AUTH_ENDPOINT}
-      - AUTH_APPNAME=${AUTH_APPNAME}
-      - AUTH_APPPASS=${AUTH_APPPASS}
-    depends_on:
-      - "broker"
-      - "proxy"
-    restart: always
-
   proxy:
     build:
-      context: ./nginx
+      context: ./proxy
     container_name: proxy
     depends_on:
       - "airpi"
@@ -1087,26 +954,26 @@ services:
     build:
       context: ./airpi
     container_name: airpi 
+    stdin_open: true
+    tty: true
+    command: sh -c "python3 first_user.py; gunicorn app:app -w 1 --bind 0.0.0.0:5000"
     environment:
-      - INFLUXDB_API_USER=${INFLUXDB_API_USER}
-      - INFLUXDB_API_PASSWORD=${INFLUXDB_API_PASSWORD}
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - AUTH_APPNAME=${AUTH_APPNAME}
-      - AUTH_APPPASS=${AUTH_APPPASS}
-      - AUTH_USERNAME=${AUTH_USERNAME}
-      - AUTH_USERPASS=${AUTH_USERPASS}
-	volumes:
-	  - api:/app
+      - INFLUXDB_API_USER
+      - INFLUXDB_API_PASSWORD
+      - TELEGRAM_BOT_TOKEN
+      - AUTH_USERNAME
+      - AUTH_USERPASS
     depends_on:
       - "database"
+      - "broker"
     restart: always
 
   broker:
     build:
       context: ./broker
     environment:
-      - MOSQUITTO_USERNAME=${MOSQUITTO_USERNAME}
-      - MOSQUITTO_PASSWORD=${MOSQUITTO_PASSWORD}
+      - MOSQUITTO_USERNAME
+      - MOSQUITTO_PASSWORD
     container_name: broker
     ports:
       - "1883:1883"
@@ -1119,8 +986,8 @@ services:
       context: ./influxdb
     container_name: database
     environment:  
-      - INFLUXDB_ADMIN_USER=${INFLUXDB_ADMIN_USER}
-      - INFLUXDB_ADMIN_PASSWORD=${INFLUXDB_ADMIN_PASSWORD}
+      - INFLUXDB_ADMIN_USER
+      - INFLUXDB_ADMIN_PASSWORD
     volumes:
       - db:/var/lib/influxdb
     ports:
@@ -1129,7 +996,8 @@ services:
 
 volumes:
   db:
-  api:
+
+
 ```
 
 Si osserva come il servizio `airpi` non includa alcun port mapping. L'accesso agli endpoint è permesso, infatti, solamente dal reverse proxy, che espone le porte `80` e `443` per connessioni rispettivamente `HTTP` ed `HTTPs`.
@@ -1173,28 +1041,6 @@ In conclusione, la seguente rappresentazione grafica descrive la soluzione archi
 \includegraphics[width=550px]{img/architettura3.png}
 \end{figure}
 
-```{=latex}
-% # Guida all'utilizzo per l'utente
-% 
-% Nel seguente paragrafo saranno riportati i passi che l’utente deve compiere per utilizzare al meglio il prodotto.
-% Attivare il dispositivo dando inizio alla configurazione. Una volta acceso questo si troverà in modalità SoftAccessPoint momento in cui l’utente si può connettere direttamente al dispositivo e, una volta effettuato l’accesso alla rete wifi desiderata, specificare all’interno dei campi dedicati alcune informazioni necessarie riportate nell’elenco sottostante: 
-% - L’indirizzo IP del Broker MQTT
-% - La porta del Broker MQTT
-% - Il nome utente e la password per inviare messaggi al Broker
-% - Un nome da assegnare allo specifico sensore (si consiglia di sceglierlo in base alla stanza in cui si decide di posizionarlo)
-% 
-% Successivamente posizionare il sensore nel luogo in cui si necessita.
-% 
-% Se si vogliono sfruttare le funzionalità offerte in più rispetto al semplice prodotto IKEA, seguire attentamente le istruzioni riportate in seguito.
-% Accedere al monitoring tool con le credenziali fornite in modo da poter osservare i dati raccolti dai sensori installati nel periodo di tempo pari all’ultima settimana. Il livello di autorizzazione definito in questo caso sarà di amministratore; ciò consente di nominare altri utenti aggiungendoli all’elenco nella sezione Telgram della navigation bar mediante il loro username.
-% Il passo finale consiste nell’inizializzare il bot su Telegram ed effettuare il binding. Questo permetterà all’utente di ricevere aggiornamenti e interagire con questo, in modo tale da ricevere via messaggio le segnalazioni di superamento dei limiti per i tre diversi livelli di qualità dell’aria rilevata dai sensori. In caso di necessità l’utente può anche rivolgersi al bot chiedendo, attraverso il comando /info nomeSensore, informazioni relative al sensore in questione come l’ultimo valore registrato di qualità e misurazione PM2.5.
-% 
-% Primo utente amministratore creato quando viene istanziato il container sulla base delle variabili ambientali definite
-% Gli utenti amministratori possono aggiungere utenti telegram e aggiungere utenti per il monitoring tool
-% Gli utenti non amministratori possono accedere solamente alla pagina dei grafici
-% L'amministratore abilita un utente telegram alla comunicazione con il bot, ma è l'utente a "bindarsi" al fine di abilitare la ricezione di notifiche. Questo permette una sicurezza da ambo i lati per evitare che utenti estranei possano parlare con il bot e per evitare che il bot possa inviare messaggi ad utenti che non li desiderano
-```
-
 \newpage
 
 # Conclusioni
@@ -1213,7 +1059,7 @@ Successivamente, è possibile:
 2. Specificare tramite l'apposito menu di configurazione:
 	- La rete Wi-Fi a cui connettersi
 	- La password della rete
-	- L'indirizzo IP del Broker MQTT utilizzato da Engine
+	- L'indirizzo IP del Broker MQTT
 	- Il nome utente e la password necessari alla connessione al Broker MQTT
 	- Il nome proprio del sensore (si consiglia di assegnare ad ogni unità il nome della stanza in cui esse si trovano)
 
@@ -1229,12 +1075,6 @@ All'interno della macchina adibita al dispiegamento dei servizi necessari divien
 	- `INFLUXDB_API_USER` (nome dell'utente "api" del database InfluxDB)
 	- `INFLUXDB_API_PASSWORD` (password dell'utente "api" del database InfluxDB)
 	- `TELEGRAM_BOT_TOKEN` (token ottenuto da BotFather in seguito alla creazione del bot Telegram)
-	- `SENSOR_STATUS_ENDPOINT` (endpoint di AirPI per comunicazioni relative a variazioni di stato dei sensori)
-	- `DATA_ENDPOINT` (endpoint di AirPI per comunicazioni relative a una nuova rilevazione da parte di un sensore)
-	- `NOTIFICATION_ENDPOINT` (endpoint di AirPI per segnalazione e trasmissione di notifiche da inviare agli utenti interessati)
-	- `AUTH_ENDPOINT` (endpoint di riferimento per il servizio di autenticazione di AirPI)
-	- `AUTH_APPNAME` (nome dell'applicativo Engine riconosciuto da AirPI)
-	- `AUTH_APPPASS` (secret dell'applicativo Engine riconosciuto da AirPI)
 	- `AUTH_USERNAME` (nome dell'utente creato al primo avvio del sistema al fine di poter accedere a Monitoring Tool)
 	- `AUTH_USERPASS` (password dell'utente creato al primo avvio del sistema al fine di poter accedere a Monitoring Tool)
 4. L'eventuale modifica del volume mapping definito in `docker-compose.yaml` in base alle proprie preferenze
@@ -1266,68 +1106,11 @@ Nel corso dello svolgimento dell'attività progettuale sono stati, inoltre, indi
 - Implementazione di un applicativo mobile in sostituzione al Bot Telegram al fine di fornire uno strumento ad-hoc per permettere l'interazione con l'utenza
 - Implementazione di appositi moduli integrativi al fine di permettere l'interazione fra VINDRKTNING ed altri accessori domotici fra cui, ad esempio, il purificatore d'aria **FÖRNUFTIG** di Ikea (che consiglia l'abbinamento pur non offrendo una soluzione in grado di interconnettere i due prodotti), la cui accensione può essere automatizzata tramite prese a muro intelligenti.
 - L'espansione di AirPI al fine di permettere:
-	- Una più variagata gestione delle utenze e dei permessi associati
-	- La possibilità di configurare più di un applicativo Engine distinto
-	- La possibilità di collegare più applicativi Engine ad utenze diverse mantenendo separati i rispettivi flussi di dati 
+	- Una più variegata gestione delle utenze e dei permessi associati
+	- La possibilità di configurare più gruppi di sensori fra loro indipendenti 
+	- La possibilità di associare ad ogni sensore un gruppo di utenti diverso,  mantenendo separati i rispettivi flussi di dati 
 
 ## Resoconto finale
 
 La realizzazione del progetto esposto individua una specifica attivtà di modifica del prodotto ufficialmente presentato da IKEA proponendo, attraverso l’integrazione di un firmware ad-hoc e l’implementazione delle componenti software necessarie, uno "**Smart Tool**" in grado di rendere altamente fruibili i dati relativi alla qualità dell'aria raccolti da uno o più sensori.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

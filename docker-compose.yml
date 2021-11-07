@@ -1,23 +1,5 @@
 version: "3"
 services:
-  engine:
-    build:
-      context: ./engine
-    container_name: engine 
-    environment:
-      - MOSQUITTO_USERNAME=${MOSQUITTO_USERNAME}
-      - MOSQUITTO_PASSWORD=${MOSQUITTO_PASSWORD}
-      - SENSOR_STATUS_ENDPOINT=${SENSOR_STATUS_ENDPOINT}
-      - DATA_ENDPOINT=${DATA_ENDPOINT}
-      - NOTIFICATION_ENDPOINT=${NOTIFICATION_ENDPOINT}
-      - AUTH_ENDPOINT=${AUTH_ENDPOINT}
-      - AUTH_APPNAME=${AUTH_APPNAME}
-      - AUTH_APPPASS=${AUTH_APPPASS}
-    depends_on:
-      - "broker"
-      - "proxy"
-    restart: always
-
   proxy:
     build:
       context: ./proxy
@@ -33,24 +15,26 @@ services:
     build:
       context: ./airpi
     container_name: airpi 
+    stdin_open: true
+    tty: true
+    command: sh -c "python3 first_user.py; gunicorn app:app -w 1 --bind 0.0.0.0:5000"
     environment:
-      - INFLUXDB_API_USER=${INFLUXDB_API_USER}
-      - INFLUXDB_API_PASSWORD=${INFLUXDB_API_PASSWORD}
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - AUTH_APPNAME=${AUTH_APPNAME}
-      - AUTH_APPPASS=${AUTH_APPPASS}
-      - AUTH_USERNAME=${AUTH_USERNAME}
-      - AUTH_USERPASS=${AUTH_USERPASS}
+      - INFLUXDB_API_USER
+      - INFLUXDB_API_PASSWORD
+      - TELEGRAM_BOT_TOKEN
+      - AUTH_USERNAME
+      - AUTH_USERPASS
     depends_on:
       - "database"
+      - "broker"
     restart: always
 
   broker:
     build:
       context: ./broker
     environment:
-      - MOSQUITTO_USERNAME=${MOSQUITTO_USERNAME}
-      - MOSQUITTO_PASSWORD=${MOSQUITTO_PASSWORD}
+      - MOSQUITTO_USERNAME
+      - MOSQUITTO_PASSWORD
     container_name: broker
     ports:
       - "1883:1883"
@@ -63,8 +47,8 @@ services:
       context: ./influxdb
     container_name: database
     environment:  
-      - INFLUXDB_ADMIN_USER=${INFLUXDB_ADMIN_USER}
-      - INFLUXDB_ADMIN_PASSWORD=${INFLUXDB_ADMIN_PASSWORD}
+      - INFLUXDB_ADMIN_USER
+      - INFLUXDB_ADMIN_PASSWORD
     volumes:
       - db:/var/lib/influxdb
     ports:
