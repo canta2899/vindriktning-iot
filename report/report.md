@@ -428,7 +428,7 @@ L'implementazione prevede, quindi:
 - L'iscrizione al topic `airsensor/#`
 - La gestione e lo storage dei messaggi ricevuti tramite un'apposita routine identificata dal decoratore `@mqtt.on_message()`
 
-Nello specifico, i dati ricevuti permettono l'aggiornamento dell'ultimo stato noto del sensore e l'eventuale esecuzione di opportune query di inserimento (tramite la libreria **InfluxDB Client**) al fine di serializzare i dati ricevuti (e corredati di apposito timestamp) all'interno del database.
+Nello specifico, i dati ricevuti permettono l'aggiornamento dell'ultimo stato noto del sensore e l'eventuale esecuzione di opportune query di inserimento (tramite la libreria **InfluxDB Client**) al fine di serializzare i dati ricevuti (corredati di apposito timestamp) all'interno del database.
 
 ## Autenticazione
 
