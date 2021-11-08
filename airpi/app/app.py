@@ -88,8 +88,8 @@ app.config['SECRET_KEY'] = os.environ['API_SECRET_KEY']
 
 app.config['MQTT_BROKER_URL'] = 'broker' 
 app.config['MQTT_BROKER_PORT'] = 1883  
-app.config['MQTT_USERNAME'] = 'mosquitto'
-app.config['MQTT_PASSWORD'] = 'homepass'
+app.config['MQTT_USERNAME'] = os.environ['MOSQUITTO_USERNAME']
+app.config['MQTT_PASSWORD'] = os.environ['MOSQUITTO_PASSWORD']
 app.config['MQTT_KEEPALIVE'] = 5
 app.config['MQTT_TLS_ENABLED'] = False
 
@@ -579,6 +579,11 @@ def forbidden(e):
 @app.errorhandler(404)
 def page_not_found(e):
     return render_template('404.html', logged=False, admin=False), 404
+
+
+@app.errorhandler(405)
+def method_not_allowed(e):
+    return render_template('405.html', logged=False, admin=False), 405
 
 
 @jwt.expired_token_loader

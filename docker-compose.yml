@@ -21,6 +21,8 @@ services:
     tty: true
     command: sh -c "python3 first_user.py; gunicorn app:app -w 1 --bind 0.0.0.0:5000"
     environment:
+      - MOSQUITTO_USERNAME
+      - MOSQUITTO_PASSWORD
       - INFLUXDB_API_USER
       - INFLUXDB_API_PASSWORD
       - TELEGRAM_BOT_TOKEN

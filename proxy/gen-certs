@@ -5,23 +5,34 @@ CA_CRT=$CERTS/rootCA.crt
 CA_KEY=$CERTS/rootCA.key
 DOMAIN_KEY=$CERTS/domain.key
 DOMAIN_CSR=$CERTS/domain.csr
-DOMAIN_EXT=$CERTS/domain.ext
+DOMAIN_EXT=./domain.ext
 DOMAIN_CRT=$CERTS/domain.crt
 
-mkdir -p $CERTS
+write_ext_file(){
 
-rm $CERTS/* > /dev/null 2>&1
+cat <<EOF > $DOMAIN_EXT
+authorityKeyIdentifier=keyid,issuer
+basicConstraints=CA:FALSE
+keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = localhost
+EOF
+
+}
 
 wait_user(){
-	echo -e "\n\n"
-	tput setaf 3; tput bold; echo "Press any button to continue"; tput sgr0;
+	echo -e "\n"
+	tput setaf 3; tput bold; echo "Press enter to continue"; tput sgr0;
 	read
-	echo -e "\n\n"
+	echo -e "\n"
 }
 
 title(){
 	tput setaf 2; tput setb 7; tput bold; echo $1; tput sgr0;
-	echo -e "\n\n"
+	echo -e "\n"
 }
 
 # openssl req -x509 -newkey rsa:4096 -keyout ./certificates/key.pem -out ./certificates/cert.pem -days 365 -nodes
@@ -29,9 +40,25 @@ title(){
 tput setaf 2; tput bold; tput setb 6; echo -e "The following procedure will" \
    	"enstablish a root CA and sign a certificate request. \nThe certificates" \
 	"will be used by the reverse proxy container. \nAfter every execution you'll" \
-	"have to restart the reverse-proxy container."
+	"have to restart the reverse-proxy container."; tput sgr0;
+
+tput bold; echo -e "\nMake sure to assign your DNS entries in the domain.ext file before running the script"; tput sgr0;
 
 wait_user
+
+if [ ! -f "$DOMAIN_EXT" ]; then
+	write_ext_file
+	tput bold; tput setaf 3; echo "WARNING"; tput sgr0;
+	tput bold;
+	echo "The $DOMAIN_EXT file was not found. One has been created in the current directory"
+	echo "Add your alt_names, save the file and re-run the following script in order to create certificates"
+	tput sgr0;
+	exit 1
+fi
+
+mkdir -p $CERTS
+
+rm $CERTS/* > /dev/null 2>&1
 
 title "Creating self signed root CA"
 openssl genrsa -des3 -out $CA_KEY 2048
@@ -47,18 +74,6 @@ wait_user
 
 title "Signing the previously created CSR as the root CA"
 
-# alt_names should contain all the possible names to reach your website
-# like something.somethingelse and www.something.somethingelse
-cat <<EOF > $DOMAIN_EXT
-authorityKeyIdentifier=keyid,issuer
-basicConstraints=CA:FALSE
-keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
-extendedKeyUsage = serverAuth
-subjectAltName = @alt_names
-
-[alt_names]
-DNS.1 = localhost
-EOF
 
 openssl x509 -req -in $DOMAIN_CSR -CA $CA_CRT -CAkey $CA_KEY -CAcreateserial -out $DOMAIN_CRT -days 825 -sha256 -extfile $DOMAIN_EXT
 

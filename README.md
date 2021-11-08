@@ -12,41 +12,24 @@ The project is under development and proposes an IoT integration over a cheap ai
 
 You'll have to flash the custom firmware on each unit, then power it up and connect to each sensor (exposed as Soft Access Point) in order to configure WiFi and MQTT parameters.
 
-### Generate certificates
+### Define variables
 
-First, cd to the `proxy` directory by running
+First, edit the `proxy/domain.ext` file by adding the **alt_names** you want to include in your certificate.
 
-```bash
-cd proxy
-```
-
-Then, edit the `gen-certs` script with your `alt_names` entries and edit the `default.conf` in order to set a `server_name` that matches your current domain. After that, you can run the script.
+Then, cd to the root directory of the repository and run 
 
 ```bash
-./gen-certs
+./configure
 ```
 
-### Assign variables
+in order to
 
-Create a `.env` file in the root directory of the repository and compile it according to the following template: 
-
-```bash
-MOSQUITTO_USERNAME=your-mosquitto-username
-MOSQUITTO_PASSWORD=your-mosquitto-password
-INFLUXDB_ADMIN_USER=your-influxdb-admin-user
-INFLUXDB_ADMIN_PASSWORD=your-influxdb-admin-password
-INFLUXDB_API_USER=your-influxdb-api-user
-INFLUXDB_API_PASSWORD=your-influxdb-api-password
-TELEGRAM_BOT_TOKEN=your-telegram-bot-token
-AUTH_USERNAME=monitortool-username
-AUTH_USERPASS=monitortool-password
-JWT_SECRET_KEY=api-jwt-secret
-API_SECRET_KEY=api-secret
-```
+1. Create `env` file containing all the needed environment variables
+2. Create the certificates needed
 
 ### Build and run
 
-Locate in the root directory of the repository and run
+In the root directory of the repository, run
 
 ```bash
 docker-compose build
