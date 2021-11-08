@@ -1,39 +1,40 @@
 from flask import (
-    Flask,
     render_template,
     Response,
-    request,
-    g, 
-    jsonify, 
     redirect,
-    url_for
+    jsonify, 
+    request,
+    url_for,
+    Flask,
+    g
 )
 
 from flask_jwt_extended import (
+    unset_access_cookies,
     create_access_token,
-    jwt_manager,
-    get_jwt,
+    set_access_cookies,
+    unset_jwt_cookies,
     get_jwt_identity,
     jwt_required,
+    jwt_manager,
     JWTManager,
-    set_access_cookies,
-    unset_access_cookies,
-    unset_jwt_cookies
+    get_jwt
 )
-
-from flask_mqtt import Mqtt
-
-# from flask_jwt_extended.utils import get_current_user, get_jwt_header, set_access_cookies
 
 from datetime import datetime, timedelta
 from flask_sqlalchemy import SQLAlchemy
 from passlib.hash import pbkdf2_sha256
 from influxdb import InfluxDBClient
+from flask_mqtt import Mqtt
 from bot import Bot
 import traceback
 import logging
 import json
 import os
+
+
+# ------- Logging -------------
+
 
 logging.basicConfig(
     filename='/log/logfile.log', 
@@ -67,21 +68,23 @@ TELEGRAM_BOT_TOKEN = os.environ['TELEGRAM_BOT_TOKEN']
 
 # -------- Queries -------------
 
-LINE = 'select mean("pm25") from "airquality" where time > now() - 10d group by time(2m), "name" fill(none)'
-BAR = 'select mean("pm25") from "airquality" where time > now() - 10d group by "name"'
+LINE = 'select mean("pm25") from "airquality" where time > now() - 24h group by time(2m), "name" fill(none)'
+BAR = 'select mean("pm25") from "airquality" where time > now() - 24h group by "name"'
 
 # -------- App Config ----------
 
 app = Flask(__name__)
-app.config["JWT_COOKIE_SECURE"] = True 
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(minutes=45)
+app.config["JWT_SECRET_KEY"] = os.environ['JWT_SECRET_KEY']
 app.config["JWT_TOKEN_LOCATION"] = ["headers", "cookies"]
-app.config["JWT_SECRET_KEY"] = "secret"
-app.config['JWT_ACCESS_COOKIE_PATH'] = '/'
-app.config['JWT_REFRESH_COOKIE_PATH'] = '/'
 app.config['JWT_COOKIE_CSRF_PROTECT'] = True 
-app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=1)
+app.config['JWT_REFRESH_COOKIE_PATH'] = '/'
+app.config['JWT_ACCESS_COOKIE_PATH'] = '/'
+app.config["JWT_COOKIE_SECURE"] = True 
+
 app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///appdb.db"
-app.config['SECRET_KEY'] = '7fb209172a3227ceccd8cb27fbbfd50e00257ac4bf43f0b141fa2ebbc384a0b6'
+
+app.config['SECRET_KEY'] = os.environ['API_SECRET_KEY']
 
 app.config['MQTT_BROKER_URL'] = 'broker' 
 app.config['MQTT_BROKER_PORT'] = 1883  
@@ -100,7 +103,7 @@ influxbot = None
 mqttinflux = None
 b = Bot(TELEGRAM_BOT_TOKEN)
 db = SQLAlchemy(app)
-
+blacklist = set()
 
 # -------- DB Models -----------
 
@@ -408,6 +411,7 @@ def on_message(client, userdata, message):
                 msg['name'], 
                 msg['ip']
             )
+            
         except Exception as e:
             traceback.print_exc()
             logging.error(
@@ -416,6 +420,10 @@ def on_message(client, userdata, message):
                 f"{traceback.format_exc()}"
             )
         
+
+# This is how connection is supposed to happen, but due to undefined
+# behaviours of FlaskMQTT sometimes the event is not catched and the 
+# api doesn't subscribe to the topic
             
 # @mqtt.on_connect()
 # def handle_connect(client, userdata, flags, rc):
@@ -485,6 +493,7 @@ def get_bot_influx():
             pass
     return influxbot
 
+
 def get_mqtt_influx():
 
     """
@@ -539,34 +548,38 @@ def is_from_browser(user_agent):
     ] 
 
 
-
 # -------- Endpoints -----------
         
-        
-# Allows to handle the automatic token refresh if desired
 
-# @app.after_request
-# def refresh_expiring_jwts(response):
-#     try:
-#         exp_timestamp = get_jwt()['exp']
-#         now = datetime.now()
-#         target_timestamp = datetime.timestamp(now + timedelta(minutes=30))
-#         if target_timestamp > exp_timestamp:
-#             access_token = create_access_token(identity=get_jwt_identity())
-#             # cookie
+@jwt.token_in_blocklist_loader
+def verify_revoke_status(jwt_header, jwt_payload):
+    jti = jwt_payload['jti']
+    return jti in blacklist      
 
-#         return response
-#     except (RuntimeError, KeyError):
-#         return response
+
+@app.after_request
+def refresh_expiring_jwts(response):
+    try:
+        exp_timestamp = get_jwt()['exp']
+        now = datetime.now()
+        target_timestamp = datetime.timestamp(now + timedelta(minutes=10))
+        if target_timestamp > exp_timestamp:
+            access_token = create_access_token(identity=get_jwt_identity())
+            set_access_cookies(response, access_token)
+        return response
+    except (RuntimeError, KeyError):
+        return response
 
  
 @app.errorhandler(403)
 def forbidden(e):
     return render_template('403.html', logged=False, admin=False), 403
  
+ 
 @app.errorhandler(404)
 def page_not_found(e):
     return render_template('404.html', logged=False, admin=False), 404
+
 
 @jwt.expired_token_loader
 def expired_token(jwt_header, jwt_payload):
@@ -964,6 +977,7 @@ def login():
 
 
 @app.route('/logout', methods=['GET'])
+@jwt_required()
 def logout():
     
     """
@@ -972,6 +986,8 @@ def logout():
     """
 
     response = redirect('/')
+    jti = get_jwt()['jti']
+    blacklist.add(jti)
     unset_jwt_cookies(response)
     return response
 

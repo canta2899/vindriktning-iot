@@ -26,6 +26,8 @@ services:
       - TELEGRAM_BOT_TOKEN
       - AUTH_USERNAME
       - AUTH_USERPASS
+      - API_SECRET_KEY
+      - JWT_SECRET_KEY
     depends_on:
       - "database"
       - "broker"

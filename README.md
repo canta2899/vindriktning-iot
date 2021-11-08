@@ -40,6 +40,8 @@ INFLUXDB_API_PASSWORD=your-influxdb-api-password
 TELEGRAM_BOT_TOKEN=your-telegram-bot-token
 AUTH_USERNAME=monitortool-username
 AUTH_USERPASS=monitortool-password
+JWT_SECRET_KEY=api-jwt-secret
+API_SECRET_KEY=api-secret
 ```
 
 ### Build and run
