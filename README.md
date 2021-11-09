@@ -19,6 +19,24 @@ The repository contains a folder for each one of the services implemented.
 - `configuration` provides a shell script in order to configure the project before building
 - `docker-compose.yml` the docker-compose file used to organize the multi-container stack
 
+## Requirements
+
+### Hardware
+
+- VINDRIKTNING by Ikea
+- D1 Mini by Wemos
+- USB-C to USB Cable (one for each sensor unit)
+- Dupont Cables
+- Soldering Iron
+- PH0 Screwdriver
+
+### Software
+
+Since the proposed solution is completely based on Docker containers except for the sensor's firmware, you'll only need:
+
+- Docker Engine running on a supported architecture
+- PlatformIO in order to build the custom VINDRIKTNING firmware (check out the [VSCode Extension](https://platformio.org/install/ide?install=vscode))
+
 ## Usage Guide
 
 ### Customize and configure your VINDRIKTNING units
