@@ -27,6 +27,7 @@ function renderLineChart(){
             datasets: dataLine
         },
         options: {
+			spanGaps: false,
             responsive: true,
             elements: {
                 point: {
@@ -48,7 +49,7 @@ function renderLineChart(){
                         display: true 
                     },
                     ticks: {
-                        max: 200,
+                        max: 450,
                         min: 0,
                         beginAtZero: true,
                         fontSize: 13,
@@ -114,7 +115,7 @@ function renderBarChart(){
                         display: true 
                     },
                     ticks: {
-                        max: 200,
+                        max: 450,
                         min: 0,
                         beginAtZero: true,
                         fontSize: 13,
