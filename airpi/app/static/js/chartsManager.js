@@ -49,7 +49,7 @@ function renderLineChart(){
                         display: true 
                     },
                     ticks: {
-                        max: 450,
+                        max: 350,
                         min: 0,
                         beginAtZero: true,
                         fontSize: 13,

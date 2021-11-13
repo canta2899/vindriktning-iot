@@ -20,6 +20,8 @@ services:
     stdin_open: true
     tty: true
     command: sh -c "python3 first_user.py; gunicorn app:app -w 1 --bind 0.0.0.0:5000"
+    volumes:
+      - users:/app/db/
     environment:
       - MOSQUITTO_USERNAME
       - MOSQUITTO_PASSWORD
@@ -63,4 +65,5 @@ services:
 
 volumes:
   db:
+  users:
 

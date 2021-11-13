@@ -5,7 +5,7 @@ import sys
 
 USERNAME = os.environ['AUTH_USERNAME']
 PASSWORD = os.environ['AUTH_USERPASS']
-DB = '/app/appdb.db'
+DB = '/app/db/appdb.db'
 
 conn = sqlite3.connect(DB)
 c = conn.cursor()

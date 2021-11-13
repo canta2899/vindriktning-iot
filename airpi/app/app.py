@@ -82,7 +82,7 @@ app.config['JWT_REFRESH_COOKIE_PATH'] = '/'
 app.config['JWT_ACCESS_COOKIE_PATH'] = '/'
 app.config["JWT_COOKIE_SECURE"] = True 
 
-app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///appdb.db"
+app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///db/appdb.db"
 
 app.config['SECRET_KEY'] = os.environ['API_SECRET_KEY']
 

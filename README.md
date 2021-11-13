@@ -117,14 +117,14 @@ server {
 Locate inside the root directory of the repository and run 
 
 ```bash
-./configure
+make env
+make certs
 ```
 
-in order to (according to your choice):
+in order to:
 
 1. Create the `env` file containing all the needed environment variables
 2. Create the certificates needed
-3. Both the previous options
 
 In order to build the container images, run:
 
